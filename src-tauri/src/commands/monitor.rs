@@ -4,8 +4,8 @@
 use super::{run_value, AppState, CmdResult};
 use tauri::State;
 
-#[tauri::command(rename = "monitor:snapshot")]
-pub async fn snapshot(state: State<'_, AppState>) -> CmdResult {
+#[tauri::command]
+pub async fn monitor_snapshot(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
     run_value(move || {
         let settings = state.database.get_settings()?;

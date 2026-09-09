@@ -31,6 +31,24 @@ const SENSITIVE_SETTINGS: &[&str] = &["teamviewer_password", "vpn_pass", "target
 pub const MAX_SWITCH_PORTS: i64 = 48;
 
 /// Converts one SQLite row into the JSON shape better-sqlite3 returned.
+/// serde_json values are not rusqlite `ToSql` without the JSON feature;
+/// normalise them into rusqlite's own dynamic value type instead.
+fn json_to_sql(value: &Value) -> rusqlite::types::Value {
+    match value {
+        Value::Null => rusqlite::types::Value::Null,
+        Value::Bool(flag) => rusqlite::types::Value::Integer(i64::from(*flag)),
+        Value::Number(number) => {
+            if let Some(int) = number.as_i64() {
+                rusqlite::types::Value::Integer(int)
+            } else {
+                rusqlite::types::Value::Real(number.as_f64().unwrap_or(0.0))
+            }
+        }
+        Value::String(text) => rusqlite::types::Value::Text(text.clone()),
+        other => rusqlite::types::Value::Text(other.to_string()),
+    }
+}
+
 pub fn row_to_json(row: &Row<'_>) -> rusqlite::Result<Value> {
     let columns: Vec<String> = row.as_ref().column_names().into_iter().map(String::from).collect();
     let mut map = Map::new();
@@ -199,7 +217,7 @@ fn save_branch_conn(connection: &Connection, data: &Value) -> AppResult<SavedRow
         }
         let mut value = data.clone();
         value["id"] = json!(id);
-        return Ok(SavedRow { id, name, summary: name.clone(), added: false, value });
+        return Ok(SavedRow { id, summary: name.clone(), name, added: false, value });
     }
     let sql = format!(
         "INSERT INTO branches ({}) VALUES ({})",
@@ -210,7 +228,7 @@ fn save_branch_conn(connection: &Connection, data: &Value) -> AppResult<SavedRow
     let id = connection.last_insert_rowid();
     let mut value = data.clone();
     value["id"] = json!(id);
-    Ok(SavedRow { id, name, summary: name.clone(), added: true, value })
+    Ok(SavedRow { id, summary: name.clone(), name, added: true, value })
 }
 
 fn device_values(data: &Value) -> AppResult<(Vec<Value>, String, String, String)> {
@@ -290,7 +308,7 @@ fn save_device_conn(connection: &Connection, data: &Value) -> AppResult<SavedRow
             tx.query_row(
                 "SELECT branch_id, device_type FROM devices WHERE id = ?1",
                 rusqlite::params![id],
-                |row| Ok((row.get(0).ok()?, row.get(1).ok()?)),
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
             )
             .ok()
         });
@@ -299,7 +317,7 @@ fn save_device_conn(connection: &Connection, data: &Value) -> AppResult<SavedRow
             return Err(AppError::new("Only one Router can be defined for each branch"));
         }
     }
-    let params: Vec<&dyn rusqlite::ToSql> = owned.iter().map(|item| item as &dyn rusqlite::ToSql).collect();
+    let params: Vec<rusqlite::types::Value> = owned.iter().map(json_to_sql).collect();
     let result_id;
     let added;
     if let Some(id) = editing_id {
@@ -309,9 +327,9 @@ fn save_device_conn(connection: &Connection, data: &Value) -> AppResult<SavedRow
             assignments.join(", "),
             DEVICE_COLUMNS.len() + 1
         );
-        let mut all: Vec<&dyn rusqlite::ToSql> = params.clone();
-        all.push(&id);
-        let changes = tx.execute(&sql, all.as_slice()).map_err(AppError::from)?;
+        let mut all = params.clone();
+        all.push(rusqlite::types::Value::Integer(id));
+        let changes = tx.execute(&sql, rusqlite::params_from_iter(all.iter())).map_err(AppError::from)?;
         if changes == 0 {
             return Err(AppError::new("Device not found"));
         }
@@ -323,7 +341,7 @@ fn save_device_conn(connection: &Connection, data: &Value) -> AppResult<SavedRow
             DEVICE_COLUMNS.join(","),
             DEVICE_COLUMNS.iter().map(|_| "?".to_string()).collect::<Vec<_>>().join(",")
         );
-        tx.execute(&sql, params.as_slice()).map_err(AppError::from)?;
+        tx.execute(&sql, rusqlite::params_from_iter(params.iter())).map_err(AppError::from)?;
         result_id = tx.last_insert_rowid();
         added = true;
     }
@@ -403,7 +421,7 @@ impl AppDatabase {
             user_data_path: user_data_path.to_path_buf(),
             recovery_file_path,
         };
-        database.sync_recovery_file()?;
+        database.sync_recovery_file();
         Ok(database)
     }
 
@@ -708,7 +726,8 @@ impl AppDatabase {
     /* --------------------------------------------------------------- branches */
 
     pub fn list_branches(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self.lock().prepare("SELECT * FROM branches ORDER BY name COLLATE NOCASE")?;
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare("SELECT * FROM branches ORDER BY name COLLATE NOCASE")?;
         rows_to_json(&mut stmt)
     }
 
@@ -799,7 +818,8 @@ impl AppDatabase {
     }
 
     pub fn list_devices(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self.lock().prepare(
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare(
             "SELECT d.*, p.status, p.ping_time
              FROM devices d
              LEFT JOIN ping_history p ON p.id = (SELECT id FROM ping_history WHERE device_id = d.id ORDER BY id DESC LIMIT 1)
@@ -811,7 +831,8 @@ impl AppDatabase {
 
     pub fn get_device(&self, id: i64) -> AppResult<Option<Value>> {
         let device = {
-            let mut stmt = self.lock().prepare("SELECT * FROM devices WHERE id = ?1")?;
+            let lock_guard = self.lock();
+            let mut stmt = lock_guard.prepare("SELECT * FROM devices WHERE id = ?1")?;
             let mut rows = stmt.query_map(rusqlite::params![id], row_to_json)?;
             match rows.next() {
                 Some(row) => Some(row?),
@@ -829,7 +850,8 @@ impl AppDatabase {
     }
 
     pub fn list_monitored_devices(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self.lock().prepare("SELECT * FROM devices WHERE is_dashboard_visible = 1 ORDER BY id")?;
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare("SELECT * FROM devices WHERE is_dashboard_visible = 1 ORDER BY id")?;
         rows_to_json(&mut stmt)
     }
 
@@ -961,7 +983,8 @@ impl AppDatabase {
 
     pub fn get_settings(&self) -> AppResult<Value> {
         let mut result = Map::new();
-        let mut stmt = self.lock().prepare("SELECT key, value FROM settings")?;
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare("SELECT key, value FROM settings")?;
         let rows: Vec<(String, String)> = {
             let mapped = stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
             mapped.collect::<rusqlite::Result<Vec<_>>>()?
@@ -1002,8 +1025,8 @@ impl AppDatabase {
                     continue;
                 }
                 let stored = if SENSITIVE_SETTINGS.contains(&key.as_str()) && !value.is_null() {
-                    let text = value.as_str().unwrap_or(&value.to_string());
-                    json!(self.vault.encrypt(text)?)
+                    let text = value.as_str().map(String::from).unwrap_or_else(|| value.to_string());
+                    json!(self.vault.encrypt(&text)?)
                 } else {
                     value.clone()
                 };
@@ -1018,9 +1041,8 @@ impl AppDatabase {
     /* ------------------------------------------------------------ credentials */
 
     pub fn list_credentials(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self
-            .lock()
-            .prepare("SELECT id, name, username, created_at, 1 AS has_password FROM credentials ORDER BY name COLLATE NOCASE")?;
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare("SELECT id, name, username, created_at, 1 AS has_password FROM credentials ORDER BY name COLLATE NOCASE")?;
         rows_to_json(&mut stmt)
     }
 
@@ -1040,7 +1062,8 @@ impl AppDatabase {
             return Ok(None);
         }
         let row = {
-            let mut stmt = self.lock().prepare("SELECT * FROM credentials WHERE id = ?1")?;
+            let lock_guard = self.lock();
+            let mut stmt = lock_guard.prepare("SELECT * FROM credentials WHERE id = ?1")?;
             let mut rows = stmt.query_map(rusqlite::params![id], row_to_json)?;
             rows.next().transpose()?
         };
@@ -1203,7 +1226,7 @@ impl AppDatabase {
             )?;
             self.audit(actor, "CREDENTIAL_UNASSIGN", &device_id.to_string(), &format!("Cleared the credential of {device_name}"));
         }
-        Ok(self.get_device_credential_state(device_id))
+        self.get_device_credential_state(device_id)
     }
 
     pub fn set_type_credential(&self, device_type: &str, credential_id: Option<i64>, actor: &str) -> AppResult<Value> {
@@ -1279,7 +1302,8 @@ impl AppDatabase {
     }
 
     pub fn list_device_credential_overview(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self.lock().prepare(
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare(
             "SELECT d.id AS device_id, d.name AS device_name, d.device_type, d.ip,
                     b.name AS branch_name, b.id AS branch_id,
                     dc.id AS direct_id, dc.name AS direct_name,
@@ -1328,7 +1352,8 @@ impl AppDatabase {
                 .ok()
         };
         let Some((id, device_type)) = device else { return Ok(vec![]) };
-        let mut stmt = self.lock().prepare(
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare(
             "SELECT c.id, c.name, c.username, 1 AS has_password, 'device' AS scope
                  FROM device_credential_assignments a JOIN credentials c ON c.id = a.credential_id
                  WHERE a.device_id = ?1
@@ -1370,7 +1395,8 @@ impl AppDatabase {
     /* ------------------------------------------------------------------ notes */
 
     pub fn list_notes(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self.lock().prepare(
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare(
             "SELECT id, name, body, pinned, color, priority, tags, created_at, updated_at
              FROM notes ORDER BY pinned DESC, priority DESC, updated_at DESC",
         )?;
@@ -1413,7 +1439,8 @@ impl AppDatabase {
             drop(connection);
             self.audit(actor, "NOTE_UPDATE", &name, &format!("Note {id}"));
             let mut row = {
-                let mut stmt = self.lock().prepare("SELECT * FROM notes WHERE id = ?1")?;
+                let lock_guard = self.lock();
+                let mut stmt = lock_guard.prepare("SELECT * FROM notes WHERE id = ?1")?;
                 let mut rows = stmt.query_map(rusqlite::params![id], row_to_json)?;
                 rows.next().transpose()?.unwrap_or(json!({}))
             };
@@ -1428,7 +1455,8 @@ impl AppDatabase {
         drop(connection);
         self.audit(actor, "NOTE_CREATE", &name, &format!("Note {row_id}"));
         let mut row = {
-            let mut stmt = self.lock().prepare("SELECT * FROM notes WHERE id = ?1")?;
+            let lock_guard = self.lock();
+            let mut stmt = lock_guard.prepare("SELECT * FROM notes WHERE id = ?1")?;
             let mut rows = stmt.query_map(rusqlite::params![row_id], row_to_json)?;
             rows.next().transpose()?.unwrap_or(json!({}))
         };
@@ -1454,7 +1482,8 @@ impl AppDatabase {
     /* --------------------------------------------------------------- snippets */
 
     pub fn list_snippets(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self.lock().prepare(
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare(
             "SELECT id, name, command, description, created_at, updated_at FROM terminal_snippets ORDER BY name COLLATE NOCASE",
         )?;
         rows_to_json(&mut stmt)
@@ -1484,7 +1513,8 @@ impl AppDatabase {
             )?;
             drop(connection);
             self.audit(actor, "SNIPPET_UPDATE", &name, &summary);
-            let mut stmt = self.lock().prepare("SELECT * FROM terminal_snippets WHERE id = ?1")?;
+            let lock_guard = self.lock();
+            let mut stmt = lock_guard.prepare("SELECT * FROM terminal_snippets WHERE id = ?1")?;
             let mut rows = stmt.query_map(rusqlite::params![id], row_to_json)?;
             return rows.next().transpose()?.ok_or_else(|| AppError::new("Snippet not found"));
         }
@@ -1495,7 +1525,8 @@ impl AppDatabase {
         let row_id = connection.last_insert_rowid();
         drop(connection);
         self.audit(actor, "SNIPPET_CREATE", &name, &summary);
-        let mut stmt = self.lock().prepare("SELECT * FROM terminal_snippets WHERE id = ?1")?;
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare("SELECT * FROM terminal_snippets WHERE id = ?1")?;
         let mut rows = stmt.query_map(rusqlite::params![row_id], row_to_json)?;
         rows.next().transpose()?.ok_or_else(|| AppError::new("Snippet not found"))
     }
@@ -1516,7 +1547,8 @@ impl AppDatabase {
     }
 
     pub fn list_terminal_targets(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self.lock().prepare(
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare(
             "SELECT d.id, d.name, d.ip, d.transport, d.model, d.location,
                     b.id AS branch_id, b.name AS branch_name, b.code AS branch_code
              FROM devices d JOIN branches b ON b.id = d.branch_id
@@ -1576,7 +1608,9 @@ impl AppDatabase {
             )?;
             for result in results {
                 let device_id = result.get("device_id").and_then(Value::as_i64).unwrap_or(0);
-                let ping_time = result.get("ping_time").cloned().unwrap_or(Value::Null);
+                let ping_time = result
+                    .get("ping_time")
+                    .and_then(Value::as_i64);
                 let status = result.get("status").and_then(Value::as_str).unwrap_or("offline");
                 insert.execute(rusqlite::params![device_id, ping_time, status])?;
                 let success = i64::from(status != "offline");
@@ -1599,21 +1633,22 @@ impl AppDatabase {
                 device["status"] = device.get("status").cloned().filter(|value| !value.is_null()).unwrap_or(json!("unknown"));
                 let history = {
                     let connection = self.lock();
-                    let mut stmt = connection.prepare(
-                        "SELECT ping_time, status, timestamp FROM ping_history WHERE device_id = ?1 ORDER BY id DESC LIMIT ?2",
-                    );
-                    match stmt.as_deref_mut() {
-                        Ok(prepared) => {
-                            let mapped = prepared.query_map(rusqlite::params![id, history_count], row_to_json);
-                            let mut rows = mapped.map(|rows| rows.collect::<rusqlite::Result<Vec<Value>>>().unwrap_or_default()).unwrap_or_default();
-                            rows.reverse();
-                            for (index, row) in rows.iter_mut().enumerate() {
-                                row["sequence"] = json!(index + 1);
-                            }
-                            rows
-                        }
-                        Err(_) => vec![],
+                    let rows = connection
+                        .prepare(
+                            "SELECT ping_time, status, timestamp FROM ping_history WHERE device_id = ?1 ORDER BY id DESC LIMIT ?2",
+                        )
+                        .and_then(|mut prepared| {
+                            let rows = prepared.query_map(rusqlite::params![id, history_count], row_to_json)?;
+                            let rows = rows.collect::<rusqlite::Result<Vec<Value>>>().unwrap_or_default();
+                            Ok(rows)
+                        })
+                        .unwrap_or_default();
+                    let mut rows = rows;
+                    rows.reverse();
+                    for (index, row) in rows.iter_mut().enumerate() {
+                        row["sequence"] = json!(index + 1);
                     }
+                    rows
                 };
                 device["history"] = Value::Array(history);
                 device
@@ -1623,7 +1658,8 @@ impl AppDatabase {
     }
 
     pub fn list_inventory(&self) -> AppResult<Vec<Value>> {
-        let mut stmt = self.lock().prepare(
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare(
             "SELECT d.*, b.name AS branch_name, b.code AS branch_code, b.warehouse_code AS branch_warehouse_code, p.status, p.ping_time
              FROM devices d JOIN branches b ON b.id = d.branch_id
              LEFT JOIN ping_history p ON p.id = (SELECT id FROM ping_history WHERE device_id = d.id ORDER BY id DESC LIMIT 1)
@@ -1635,7 +1671,8 @@ impl AppDatabase {
 
     pub fn list_audit(&self, limit: i64) -> AppResult<Vec<Value>> {
         let limit = limit.clamp(1, 1000);
-        let mut stmt = self.lock().prepare("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?1")?;
+        let lock_guard = self.lock();
+        let mut stmt = lock_guard.prepare("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?1")?;
         rows_to_json(&mut stmt)
     }
 

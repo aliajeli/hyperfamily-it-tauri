@@ -32,8 +32,8 @@ fn audit_result(state: &AppState, actor: &str, result: &Value) {
     state.database.audit(actor, "AGENT_IMPORT", target, &details);
 }
 
-#[tauri::command(rename = "store-update:import-agent")]
-pub async fn import_agent(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn store_update_import_agent(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
     let checkout = checkout_of(&payload);
     let emitter = Some(state.emitter.clone());
@@ -44,8 +44,8 @@ pub async fn import_agent(state: State<'_, AppState>, payload: Option<Value>) ->
     })
 }
 
-#[tauri::command(rename = "store-update:import-agent-all")]
-pub async fn import_agent_all(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn store_update_import_agent_all(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
     let checkouts: Vec<Value> = payload
         .as_ref()
@@ -68,15 +68,15 @@ pub async fn import_agent_all(state: State<'_, AppState>, payload: Option<Value>
     })
 }
 
-#[tauri::command(rename = "store-update:version")]
-pub async fn version(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn store_update_version(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let _ = state.actor()?;
     let checkout = checkout_of(&payload);
     run_value(move || Ok(futures_now(state.store_update.check_one(&checkout))))
 }
 
-#[tauri::command(rename = "store-update:installed")]
-pub async fn installed(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn store_update_installed(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
     let checkout = checkout_of(&payload);
     run_value(move || {
@@ -89,8 +89,8 @@ pub async fn installed(state: State<'_, AppState>, payload: Option<Value>) -> Cm
     })
 }
 
-#[tauri::command(rename = "store-update:versions")]
-pub async fn versions(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn store_update_versions(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
     let checkouts: Vec<Value> = payload
         .as_ref()
@@ -111,8 +111,8 @@ pub async fn versions(state: State<'_, AppState>, payload: Option<Value>) -> Cmd
     })
 }
 
-#[tauri::command(rename = "store-update:test-access")]
-pub async fn test_access(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn store_update_test_access(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
     let payload = payload.unwrap_or(json!({}));
     run_value(move || {
@@ -152,8 +152,8 @@ pub async fn test_access(state: State<'_, AppState>, payload: Option<Value>) -> 
     })
 }
 
-#[tauri::command(rename = "store-update:deploy")]
-pub async fn deploy(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn store_update_deploy(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
     let payload = payload.unwrap_or(json!({}));
     let checkout = checkout_of(&Some(payload.clone()));
@@ -194,8 +194,8 @@ pub async fn deploy(state: State<'_, AppState>, payload: Option<Value>) -> CmdRe
     })
 }
 
-#[tauri::command(rename = "store-update:deploy-all")]
-pub async fn deploy_all(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn store_update_deploy_all(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
     let payload = payload.unwrap_or(json!({}));
     let checkouts: Vec<Value> = payload

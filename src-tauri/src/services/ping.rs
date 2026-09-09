@@ -27,7 +27,7 @@ pub async fn ping_host(host: &str, timeout_ms: u64) -> Value {
     command.kill_on_drop(true);
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
+        // tokio::process::Command carries an inherent creation_flags on Windows.
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
     let started = std::time::Instant::now();
@@ -93,14 +93,17 @@ pub async fn monitor_tick(
 ) -> AppResult<()> {
     let devices = database.list_monitored_devices()?;
     if !devices.is_empty() {
-        let probes = devices.iter().map(|device| {
-            let ip = device.get("ip").and_then(Value::as_str).unwrap_or("").to_string();
-            let id = device.get("id").and_then(Value::as_i64).unwrap_or(0);
-            async move {
-                let result = ping_host(&ip, 1000).await;
-                json!({ "device_id": id, "status": result["status"], "ping_time": result["ping_time"] })
-            }
-        });
+        let probes: Vec<_> = devices
+            .iter()
+            .map(|device| {
+                let ip = device.get("ip").and_then(Value::as_str).unwrap_or("").to_string();
+                let id = device.get("id").and_then(Value::as_i64).unwrap_or(0);
+                async move {
+                    let result = ping_host(&ip, 1000).await;
+                    json!({ "device_id": id, "status": result["status"], "ping_time": result["ping_time"] })
+                }
+            })
+            .collect();
         let results: Vec<Value> = futures_join(probes).await;
         database.record_ping_batch(&results)?;
     }
@@ -112,7 +115,7 @@ pub async fn monitor_tick(
 }
 
 /// Poor-man's join on a fixed list (avoids pulling futures-util).
-async fn futures_join(tasks: Vec<impl std::future::Future<Output = Value>>) -> Vec<Value> {
+async fn futures_join(tasks: Vec<impl std::future::Future<Output = Value> + Send + 'static>) -> Vec<Value> {
     let mut set = tokio::task::JoinSet::new();
     for task in tasks {
         set.spawn(task);

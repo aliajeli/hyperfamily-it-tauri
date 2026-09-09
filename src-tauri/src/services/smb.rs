@@ -4,7 +4,7 @@
 use crate::error::{AppError, AppResult};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::process::Command;
 use std::sync::Arc;
@@ -35,7 +35,7 @@ pub fn run_command(command: &str, args: &[String], timeout_ms: u64) -> RunOutcom
     };
     cmd.stdin(std::process::Stdio::null());
     let child = cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()).spawn();
-    let Some(mut child) = child else {
+    let Ok(mut child) = child else {
         return RunOutcome { ok: false, code: -1, stdout: String::new(), stderr: format!("{command} could not be started"), timed_out: false };
     };
     let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
@@ -200,16 +200,21 @@ impl SmbSessionManager {
             let clean = clean.clone();
             let credentials = credentials.clone();
             async move {
-                let mut guard = sessions.lock();
-                if let Some(entry) = guard.get_mut(&key) {
-                    entry.count += 1;
+                let already = {
+                    let mut guard = sessions.lock();
+                    if let Some(entry) = guard.get_mut(&key) {
+                        entry.count += 1;
+                        true
+                    } else {
+                        guard.insert(key.clone(), SessionEntry { count: 1, ready: None });
+                        false
+                    }
+                };
+                if already {
                     return;
                 }
                 let manager = SmbSessionManager { sessions: sessions.clone() };
-                let connect = async move { manager.connect(&clean, &credentials).await };
-                guard.insert(key.clone(), SessionEntry { count: 1, ready: None });
-                drop(guard);
-                let outcome = connect.await;
+                let outcome = manager.connect(&clean, &credentials).await;
                 let mut guard = sessions.lock();
                 if let Some(entry) = guard.get_mut(&key) {
                     entry.ready = Some(outcome);

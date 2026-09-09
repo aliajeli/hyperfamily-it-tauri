@@ -637,7 +637,9 @@ async fn run_pipeline(
             COPY_TIMEOUT_MS,
         )
         .await;
-        progress_rx.close();
+        // The copy closure owns the last live sender; once stream_copy returns
+        // the channel closes and the drain task finishes on its own.
+        drop(progress_tx);
         let _ = progress_task.await;
         if let Err(error) = copy_result {
             record("copy", "failed", &format!("Copy failed — {}", error.message));

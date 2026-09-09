@@ -24,8 +24,8 @@ fn apply_filters<R: tauri::Runtime>(
     builder
 }
 
-#[tauri::command(rename = "dialog:select-file")]
-pub async fn select_file(app: tauri::AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn dialog_select_file(app: tauri::AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let _ = state.actor()?;
     let options = payload.unwrap_or(json!({}));
     let title = options.get("title").and_then(Value::as_str).unwrap_or("Select file").to_string();
@@ -42,8 +42,8 @@ pub async fn select_file(app: tauri::AppHandle, state: State<'_, AppState>, payl
     })
 }
 
-#[tauri::command(rename = "dialog:select-files")]
-pub async fn select_files(app: tauri::AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn dialog_select_files(app: tauri::AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let _ = state.actor()?;
     let options = payload.unwrap_or(json!({}));
     let title = options.get("title").and_then(Value::as_str).unwrap_or("Select files").to_string();
@@ -63,8 +63,8 @@ pub async fn select_files(app: tauri::AppHandle, state: State<'_, AppState>, pay
     Ok(json!(paths))
 }
 
-#[tauri::command(rename = "dialog:select-directory")]
-pub async fn select_directory(app: tauri::AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn dialog_select_directory(app: tauri::AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let _ = state.actor()?;
     let options = payload.unwrap_or(json!({}));
     let title = options.get("title").and_then(Value::as_str).unwrap_or("Select folder").to_string();

@@ -6,8 +6,8 @@ use crate::services::device_webview;
 use serde_json::{json, Value};
 use tauri::{Manager, State};
 
-#[tauri::command(rename = "app:info")]
-pub async fn info(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdResult {
+#[tauri::command]
+pub async fn app_info(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
     let package = app.package_info();
     let data_path = app
@@ -23,8 +23,8 @@ pub async fn info(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdResul
     }))
 }
 
-#[tauri::command(rename = "app:open-external")]
-pub async fn open_external(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn app_open_external(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let _ = state.actor()?;
     let value = payload.as_ref().and_then(Value::as_str).unwrap_or("").trim().to_string();
     // Only http(s) URLs may leave the app, matching the Electron handler.
@@ -52,16 +52,16 @@ pub async fn open_external(state: State<'_, AppState>, payload: Option<Value>) -
     Ok(json!({ "success": true }))
 }
 
-#[tauri::command(rename = "app:path-exists")]
-pub async fn path_exists(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn app_path_exists(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let _ = state.actor()?;
     let value = payload.as_ref().and_then(Value::as_str).unwrap_or("");
     Ok(json!(std::fs::metadata(value).is_ok()))
 }
 
 /// Pre-auth on purpose (the login screen is themed too).
-#[tauri::command(rename = "remote:palette")]
-pub async fn palette(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn remote_palette(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let palette = payload.unwrap_or(json!({}));
     device_webview::broadcast_palette(&palette);
     let _ = state;

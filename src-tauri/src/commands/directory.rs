@@ -6,8 +6,8 @@ use crate::services::excel::ExcelService;
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 
-#[tauri::command(rename = "directory:template")]
-pub async fn template(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdResult {
+#[tauri::command]
+pub async fn directory_template(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdResult {
     let actor = state.actor()?;
     let picked = tokio::task::spawn_blocking(move || {
         app.dialog()
@@ -31,8 +31,8 @@ pub async fn template(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdR
     run_value(move || ExcelService::new(&state.database).create_template(&path, &actor))
 }
 
-#[tauri::command(rename = "directory:import")]
-pub async fn import(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdResult {
+#[tauri::command]
+pub async fn directory_import(app: tauri::AppHandle, state: State<'_, AppState>) -> CmdResult {
     let actor = state.actor()?;
     let picked = tokio::task::spawn_blocking(move || {
         app.dialog()

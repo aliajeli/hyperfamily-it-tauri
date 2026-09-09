@@ -3,6 +3,7 @@
 //! green while a Fortinet virtual adapter actually holds a routable address.
 
 use crate::error::{AppError, AppResult};
+use crate::services::Emitter;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -196,7 +197,8 @@ impl VpnService {
 
     pub fn status_value(&self, message: Option<&str>) -> Value {
         let state = self.state.lock();
-        let installed = find_forticlient(self.database.get_settings().ok().and_then(|settings| settings.get("forticlient_path").and_then(Value::as_str))).is_some();
+        let settings = self.database.get_settings().unwrap_or(json!({}));
+        let installed = find_forticlient(settings.get("forticlient_path").and_then(Value::as_str)).is_some();
         json!({
             "state": state.state,
             "mode": state.mode,
@@ -223,12 +225,8 @@ impl VpnService {
 
     /// Availability probe used by the UI before offering the global mode.
     pub fn probe(&self) -> Value {
-        let executable = find_forticlient(
-            self.database
-                .get_settings()
-                .ok()
-                .and_then(|settings| settings.get("forticlient_path").and_then(Value::as_str)),
-        );
+        let settings = self.database.get_settings().unwrap_or(json!({}));
+        let executable = find_forticlient(settings.get("forticlient_path").and_then(Value::as_str));
         json!({
             "installed": executable.is_some(),
             "path": executable,
@@ -380,7 +378,7 @@ impl VpnService {
             for (exe, args) in DISCONNECT_COMMANDS {
                 let Some(root) = roots.iter().find(|root| std::fs::metadata(format!("{root}\\{exe}")).is_ok()) else { continue };
                 let full_path = format!("{root}\\{exe}");
-                let args: Vec<String> = args.iter().map(String::from).collect();
+                let args: Vec<String> = args.iter().map(|arg| arg.to_string()).collect();
                 let mut command = tokio::process::Command::new(&full_path);
                 command.args(&args);
                 #[cfg(windows)]
@@ -459,7 +457,7 @@ impl VpnService {
             }
             Err(error) => json!({
                 "ok": false, "stage": "transport", "target": target, "username": username,
-                "outcome": "error", "reason": error.message, "durationMs": started.elapsed().as_millis() as u64
+                "outcome": "error", "reason": error, "durationMs": started.elapsed().as_millis() as u64
             }),
         }
     }

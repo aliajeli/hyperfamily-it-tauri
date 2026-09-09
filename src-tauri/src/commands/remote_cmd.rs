@@ -12,8 +12,8 @@ fn futures_now<F: std::future::Future>(future: F) -> F::Output {
     tokio::task::block_in_place(|| tauri::async_runtime::block_on(future))
 }
 
-#[tauri::command(rename = "remote:connect")]
-pub async fn connect(app: AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn remote_connect(app: AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
     let request = payload.unwrap_or(json!({}));
     let palette = request.get("palette").cloned().unwrap_or(json!({}));
@@ -37,8 +37,8 @@ pub async fn connect(app: AppHandle, state: State<'_, AppState>, payload: Option
     })
 }
 
-#[tauri::command(rename = "remote:probe")]
-pub async fn probe(state: State<'_, AppState>) -> CmdResult {
+#[tauri::command]
+pub async fn remote_probe(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
     run_value(move || Ok(RemoteService::new(state.database.clone()).probe()))
 }

@@ -18,8 +18,6 @@ pub struct SecureVault {
 fn dpapi_protect(plain: &[u8]) -> AppResult<Vec<u8>> {
     use windows::Win32::Security::Cryptography::{CryptProtectData, CRYPT_INTEGER_BLOB};
     use windows::Win32::Foundation::LocalFree;
-    use windows::Win32::System::SystemServices::MEMORY_RESOURCE_NOTIFICATION_HIGH;
-    let _ = MEMORY_RESOURCE_NOTIFICATION_HIGH; // keep feature import used on all cfg paths
     let input = CRYPT_INTEGER_BLOB { cbData: plain.len() as u32, pbData: plain.as_ptr() as *mut u8 };
     let mut out = CRYPT_INTEGER_BLOB::default();
     unsafe {
@@ -35,7 +33,7 @@ fn dpapi_protect(plain: &[u8]) -> AppResult<Vec<u8>> {
         .map_err(|e| AppError::new(format!("DPAPI encryption failed: {e}")))?;
         let slice = std::slice::from_raw_parts(out.pbData, out.cbData as usize);
         let bytes = slice.to_vec();
-        let _ = LocalFree(Some(out.pbData as _));
+        let _ = LocalFree(Some(windows::Win32::Foundation::HLOCAL(out.pbData.cast())));
         Ok(bytes)
     }
 }
@@ -47,11 +45,11 @@ fn dpapi_unprotect(blob: &[u8]) -> AppResult<Vec<u8>> {
     let input = CRYPT_INTEGER_BLOB { cbData: blob.len() as u32, pbData: blob.as_ptr() as *mut u8 };
     let mut out = CRYPT_INTEGER_BLOB::default();
     unsafe {
-        CryptUnprotectData(&input, None, None, None, 0, &mut out)
+        CryptUnprotectData(&input, None, None, None, None, 0, &mut out)
             .map_err(|e| AppError::new(format!("DPAPI decryption failed: {e}")))?;
         let slice = std::slice::from_raw_parts(out.pbData, out.cbData as usize);
         let bytes = slice.to_vec();
-        let _ = LocalFree(Some(out.pbData as _));
+        let _ = LocalFree(Some(windows::Win32::Foundation::HLOCAL(out.pbData.cast())));
         Ok(bytes)
     }
 }
@@ -130,7 +128,10 @@ impl SecureVault {
                     use std::io::Write;
                     file.write_all(&raw)?;
                 }
-                Err(_) => std::fs::read(&self.key_path)?,
+                Err(_) => {
+                    let existing = std::fs::read(&self.key_path)?;
+                    raw.copy_from_slice(&existing[..32.min(existing.len())]);
+                }
             }
             raw.to_vec()
         };
@@ -166,7 +167,8 @@ impl SecureVault {
         let mut written = cipher.update(value.as_bytes(), &mut ciphertext)?;
         written += cipher.finalize(&mut ciphertext[written..])?;
         ciphertext.truncate(written);
-        let tag = cipher.tag().map(|t| t.to_vec()).unwrap_or_default();
+        let mut tag = vec![0u8; 16];
+        cipher.get_tag(&mut tag)?;
         Ok(format!(
             "aes:{}:{}:{}",
             base64::engine::general_purpose::STANDARD.encode(iv),
@@ -209,7 +211,7 @@ impl SecureVault {
             )?;
             let mut plain = vec![0u8; ciphertext.len() + 16];
             let mut written = decipher.update(&ciphertext, &mut plain)?;
-            decipher.set_tag(&tag);
+            decipher.set_tag(&tag).map_err(AppError::from)?;
             written += decipher.finalize(&mut plain[written..])?;
             plain.truncate(written);
             return Ok(String::from_utf8_lossy(&plain).to_string());

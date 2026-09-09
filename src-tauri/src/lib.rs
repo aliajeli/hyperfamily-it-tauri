@@ -12,7 +12,7 @@ use services::smb::SmbSessionManager;
 use services::store_agent::StoreAgentService;
 use services::store_update::StoreUpdateService;
 use services::terminal::TerminalService;
-use services::update::UpdateService;
+use services::updater::UpdateService;
 use services::vault::SecureVault;
 use services::vpn::VpnService;
 use serde_json::Value;
@@ -65,7 +65,8 @@ pub fn run() {
                     database
                         .get_settings()
                         .ok()
-                        .and_then(|settings| settings.get("store_program_name").and_then(Value::as_str).unwrap_or("").to_string())
+                        .map(|settings| settings.get("store_program_name").and_then(Value::as_str).unwrap_or("").to_string())
+                        .unwrap_or_default()
                 })
             };
             let store_agent = Arc::new(StoreAgentService::new(
@@ -104,16 +105,8 @@ pub fn run() {
             start_ping_loop(app.handle().clone(), emitter.clone());
             start_vpn_health_loop(vpn);
 
-            // --- main window: hidden until first paint finishes ----------------
+            // Safety net: never leave the operator staring at nothing.
             if let Some(window) = app.get_webview_window("main") {
-                let window_clone = window.clone();
-                window.on_page_load(move |_window, payload| {
-                    if payload.event() == tauri::webview::PageLoadEvent::Ended {
-                        let _ = window_clone.show();
-                        let _ = window_clone.set_focus();
-                    }
-                });
-                // Safety net: never leave the operator staring at nothing.
                 let fallback = window.clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_secs(6));
@@ -126,83 +119,90 @@ pub fn run() {
 
             Ok(())
         })
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Finished && webview.label() == "main" {
+                let window = webview.window();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
-            commands::auth::login,
-            commands::auth::status,
-            commands::auth::logout,
-            commands::auth::update_credentials,
-            commands::auth::change_password,
-            commands::auth::recover_status,
-            commands::auth::recover,
-            commands::auth::set_recovery_pin,
-            commands::auth::remember_credentials,
-            commands::auth::remembered_credentials,
-            commands::branches::list,
-            commands::branches::save,
-            commands::branches::remove,
-            commands::branches::remove_all,
-            commands::devices::list,
-            commands::devices::save,
-            commands::devices::remove,
-            commands::monitor::snapshot,
-            commands::settings::get,
-            commands::settings::save,
-            commands::credentials::list,
-            commands::credentials::reveal,
-            commands::credentials::save,
-            commands::credentials::remove,
-            commands::credentials::mappings,
-            commands::credentials::credential_map,
-            commands::credentials::for_device,
-            commands::credentials::save_mappings,
-            commands::credentials::assign_device,
-            commands::credentials::assign_type,
-            commands::credentials::overview,
-            commands::inventory::list,
-            commands::inventory::export,
-            commands::directory::template,
-            commands::directory::import,
-            commands::remote_cmd::connect,
-            commands::remote_cmd::probe,
-            commands::app_cmd::palette,
-            commands::terminal_cmd::targets,
-            commands::terminal_cmd::open,
-            commands::terminal_cmd::write,
-            commands::terminal_cmd::resize,
-            commands::terminal_cmd::close,
-            commands::snippets::list,
-            commands::snippets::save,
-            commands::snippets::remove,
-            commands::notes::list,
-            commands::notes::save,
-            commands::notes::remove,
-            commands::vpn_cmd::status,
-            commands::vpn_cmd::probe,
-            commands::vpn_cmd::connect,
-            commands::vpn_cmd::disconnect,
-            commands::vpn_cmd::diagnose,
-            commands::update_cmd::check,
-            commands::update_cmd::state_of,
-            commands::update_cmd::download,
-            commands::update_cmd::pause,
-            commands::update_cmd::resume,
-            commands::update_cmd::stop,
-            commands::update_cmd::install,
-            commands::audit::list,
-            commands::dialog::select_file,
-            commands::dialog::select_files,
-            commands::dialog::select_directory,
-            commands::app_cmd::info,
-            commands::app_cmd::open_external,
-            commands::app_cmd::path_exists,
-            commands::store_update_cmd::import_agent,
-            commands::store_update_cmd::import_agent_all,
-            commands::store_update_cmd::version,
-            commands::store_update_cmd::installed,
-            commands::store_update_cmd::versions,
-            commands::store_update_cmd::test_access,
-            commands::store_update_cmd::deploy,
-            commands::store_update_cmd::deploy_all,
+            commands::auth::auth_login,
+            commands::auth::auth_status,
+            commands::auth::auth_logout,
+            commands::auth::auth_update_credentials,
+            commands::auth::auth_change_password,
+            commands::auth::auth_recover_status,
+            commands::auth::auth_recover,
+            commands::auth::auth_set_recovery_pin,
+            commands::auth::auth_remember_credentials,
+            commands::auth::auth_remembered_credentials,
+            commands::branches::branches_list,
+            commands::branches::branches_save,
+            commands::branches::branches_remove,
+            commands::branches::branches_remove_all,
+            commands::devices::devices_list,
+            commands::devices::devices_save,
+            commands::devices::devices_remove,
+            commands::monitor::monitor_snapshot,
+            commands::settings::settings_get,
+            commands::settings::settings_save,
+            commands::credentials::credentials_list,
+            commands::credentials::credentials_reveal,
+            commands::credentials::credentials_save,
+            commands::credentials::credentials_remove,
+            commands::credentials::credentials_mappings,
+            commands::credentials::credentials_credential_map,
+            commands::credentials::credentials_for_device,
+            commands::credentials::credentials_save_mappings,
+            commands::credentials::credentials_assign_device,
+            commands::credentials::credentials_assign_type,
+            commands::credentials::credentials_overview,
+            commands::inventory::inventory_list,
+            commands::inventory::inventory_export,
+            commands::directory::directory_template,
+            commands::directory::directory_import,
+            commands::remote_cmd::remote_connect,
+            commands::remote_cmd::remote_probe,
+            commands::app_cmd::app_info,
+            commands::app_cmd::app_open_external,
+            commands::app_cmd::app_path_exists,
+            commands::app_cmd::remote_palette,
+            commands::terminal_cmd::terminal_targets,
+            commands::terminal_cmd::terminal_open,
+            commands::terminal_cmd::terminal_write,
+            commands::terminal_cmd::terminal_resize,
+            commands::terminal_cmd::terminal_close,
+            commands::snippets::snippets_list,
+            commands::snippets::snippets_save,
+            commands::snippets::snippets_remove,
+            commands::notes::notes_list,
+            commands::notes::notes_save,
+            commands::notes::notes_remove,
+            commands::vpn_cmd::vpn_status,
+            commands::vpn_cmd::vpn_probe,
+            commands::vpn_cmd::vpn_connect,
+            commands::vpn_cmd::vpn_disconnect,
+            commands::vpn_cmd::vpn_diagnose,
+            commands::update_cmd::update_check,
+            commands::update_cmd::update_state,
+            commands::update_cmd::update_download,
+            commands::update_cmd::update_pause,
+            commands::update_cmd::update_resume,
+            commands::update_cmd::update_stop,
+            commands::update_cmd::update_install,
+            commands::audit::audit_list,
+            commands::dialog::dialog_select_file,
+            commands::dialog::dialog_select_files,
+            commands::dialog::dialog_select_directory,
+            commands::store_update_cmd::store_update_import_agent,
+            commands::store_update_cmd::store_update_import_agent_all,
+            commands::store_update_cmd::store_update_version,
+            commands::store_update_cmd::store_update_installed,
+            commands::store_update_cmd::store_update_versions,
+            commands::store_update_cmd::store_update_test_access,
+            commands::store_update_cmd::store_update_deploy,
+            commands::store_update_cmd::store_update_deploy_all,
         ])
         .run(tauri::generate_context!())
         .expect("error while running HyperFamily Branch Monitor");

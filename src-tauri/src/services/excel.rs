@@ -6,6 +6,7 @@
 //! build so previously distributed workbooks keep importing unchanged.
 
 use crate::db::AppDatabase;
+use serde_json::{json, Value};
 use crate::error::{AppError, AppResult};
 use umya_spreadsheet::{
     Alignment, Border, BorderStyleValues, Color, Coordinate, DataValidation, DataValidationOperatorValues,
@@ -208,16 +209,16 @@ fn style_sheet(worksheet: &mut umya_spreadsheet::Worksheet, headers: &[String]) 
     freeze_top_row(worksheet);
     let last_column = column_letter(headers.len() as u32);
     worksheet.set_auto_filter(format!("A1:{last_column}1"));
-    worksheet.get_row_dimension_mut(&1).set_height(28.0);
+    worksheet.row_dimension_mut(1).set_height(28.0);
     for (index, header) in headers.iter().enumerate() {
         let letter = column_letter(index as u32 + 1);
         {
-            let cell = worksheet.get_cell_mut(format!("{letter}1").as_str());
+            let cell = worksheet.cell_mut(format!("{letter}1").as_str());
             cell.set_value(header.as_str());
             let style = header_style();
             cell.set_style(style);
         }
-        worksheet.get_column_dimension_mut(&letter).set_width(width_for(header));
+        worksheet.column_dimension_mut(&letter).set_width(width_for(header));
     }
 }
 
@@ -270,13 +271,13 @@ fn tab_color(worksheet: &mut umya_spreadsheet::Worksheet, argb: &str) {
 }
 
 fn create_instructions_sheet(book: &mut umya_spreadsheet::Workbook) {
-    let (_, worksheet) = book.new_sheet("Instructions").expect("fresh workbook");
+    let worksheet = book.new_sheet("Instructions").expect("fresh workbook");
     tab_color(worksheet, "FF88C0D0");
     let headers: Vec<String> = vec!["Step".into(), "Topic".into(), "Instruction".into()];
     style_sheet(worksheet, &headers);
-    worksheet.get_column_dimension_mut("A").set_width(6.0);
-    worksheet.get_column_dimension_mut("B").set_width(25.0);
-    worksheet.get_column_dimension_mut("C").set_width(112.0);
+    worksheet.column_dimension_mut("A").set_width(6.0);
+    worksheet.column_dimension_mut("B").set_width(25.0);
+    worksheet.column_dimension_mut("C").set_width(112.0);
     let instructions: [(u32, &str, String); 10] = [
         (1, "Branches first", "Enter every location in Branches. Branch Code and Warehouse Code must each be unique. Branch Name, Branch Code, and Warehouse Code are required.".into()),
         (2, "Equipment sheets", "Use the dedicated Router, Switch, iLO, Server, NVR, AccessPoint, Scale, Client, Checkout, or POS sheet. Each sheet contains only fields available for that equipment type.".into()),
@@ -291,27 +292,27 @@ fn create_instructions_sheet(book: &mut umya_spreadsheet::Workbook) {
     ];
     for (row, (step, topic, instruction)) in instructions.iter().enumerate() {
         let row_number = row as u32 + 2;
-        worksheet.get_cell_mut((1u32, row_number)).set_value(step.to_string());
-        worksheet.get_cell_mut((2u32, row_number)).set_value(*topic);
-        worksheet.get_cell_mut((3u32, row_number)).set_value(instruction.clone());
-        worksheet.get_row_dimension_mut(&row_number).set_height(38.0);
+        worksheet.cell_mut((1u32, row_number)).set_value(step.to_string());
+        worksheet.cell_mut((2u32, row_number)).set_value(*topic);
+        worksheet.cell_mut((3u32, row_number)).set_value(instruction.clone());
+        worksheet.row_dimension_mut(row_number).set_height(38.0);
     }
 }
 
 fn create_branches_sheet(book: &mut umya_spreadsheet::Workbook) {
-    let (_, worksheet) = book.new_sheet("Branches").expect("fresh workbook");
+    let worksheet = book.new_sheet("Branches").expect("fresh workbook");
     tab_color(worksheet, "FFA3BE8C");
     let headers: Vec<String> = BRANCH_HEADERS.iter().map(|header| (*header).into()).collect();
     style_sheet(worksheet, &headers);
     let widths = [("A", 24.0), ("B", 18.0), ("C", 20.0), ("H", 22.0), ("I", 20.0), ("J", 22.0), ("K", 20.0)];
     for (letter, width) in widths {
-        worksheet.get_column_dimension_mut(letter).set_width(width);
+        worksheet.column_dimension_mut(letter).set_width(width);
     }
 }
 
 fn create_equipment_sheet(book: &mut umya_spreadsheet::Workbook, type_name: &str) {
     let headers = device_sheet_headers(type_name);
-    let (_, worksheet) = book.new_sheet(type_name).expect("fresh workbook");
+    let worksheet = book.new_sheet(type_name).expect("fresh workbook");
     tab_color(worksheet, if type_name == "Switch" { "FFB48EAD" } else { "FF81A1C1" });
     let last_column = headers.len() as u32;
     style_sheet(worksheet, &headers);
@@ -361,7 +362,7 @@ impl<'a> ExcelService<'a> {
             .map_err(|error| AppError::new(format!("The workbook could not be read: {error}")))?;
         let mut errors: Vec<String> = Vec::new();
 
-        let legacy_layout = book.get_sheet_by_name("Devices").is_ok();
+        let legacy_layout = book.sheet_by_name("Devices").is_ok();
         let branch_headers: Vec<String> = (if legacy_layout { LEGACY_BRANCH_HEADERS } else { BRANCH_HEADERS })
             .iter()
             .map(|header| (*header).into())
@@ -394,7 +395,7 @@ impl<'a> ExcelService<'a> {
             }
             rows
         };
-        let port_rows = if legacy_layout && book.get_sheet_by_name("Switch Ports").is_ok() {
+        let port_rows = if legacy_layout && book.sheet_by_name("Switch Ports").is_ok() {
             let headers: Vec<String> = PORT_HEADERS.iter().map(|header| (*header).into()).collect();
             read_sheet_rows(&book, "Switch Ports", &headers, true, &mut errors)
         } else {
@@ -670,7 +671,7 @@ impl<'a> ExcelService<'a> {
             let _ = worksheet.set_name("Inventory");
             for (index, (_, header, width)) in columns.iter().enumerate() {
                 let letter = column_letter(index as u32 + 1);
-                let cell = worksheet.get_cell_mut(format!("{letter}1").as_str());
+                let cell = worksheet.cell_mut(format!("{letter}1").as_str());
                 cell.set_value(*header);
                 let mut style = Style::default();
                 style.font_mut().set_bold(true);
@@ -679,10 +680,10 @@ impl<'a> ExcelService<'a> {
                 pattern.set_pattern_type(PatternValues::Solid);
                 pattern.set_foreground_color(header_color("FF5E81AC"));
                 let mut alignment = Alignment::default();
-                alignment.set_vertical(VerticalAlignmentValues::Middle);
+                alignment.set_vertical(VerticalAlignmentValues::Center);
                 style.set_alignment(alignment);
                 cell.set_style(style);
-                worksheet.get_column_dimension_mut(&letter).set_width(*width);
+                worksheet.column_dimension_mut(&letter).set_width(*width);
             }
             let last_column = column_letter(columns.len() as u32);
             let last_row = rows.len() as u32 + 1;
@@ -709,7 +710,7 @@ impl<'a> ExcelService<'a> {
                         continue;
                     }
                     let coordinate = format!("{}{row_number}", column_letter(index as u32 + 1));
-                    let cell = worksheet.get_cell_mut(coordinate.as_str());
+                    let cell = worksheet.cell_mut(coordinate.as_str());
                     cell.set_value(value);
                     let mut style = Style::default();
                     let mut alignment = Alignment::default();
@@ -754,10 +755,16 @@ fn cell_text(value: &Value) -> String {
 }
 
 fn is_valid_host(value: &str) -> bool {
-    if value.is_empty() {
+    if value.is_empty() || value.len() > 253 {
         return false;
     }
-    let hostname = regex::Regex::new(r"^(?=.{1,253}$)(?!-)(?:[A-Za-z0-9-]{1,63}\.)*[A-Za-z0-9-]{1,63}$").expect("static regex");
+    if value.starts_with('-') {
+        return false;
+    }
+    // Same accept set as the original look-ahead pattern: dot-separated
+    // labels, each 1-63 letters/digits/hyphens, no empty labels, no leading
+    // hyphen, no trailing dot.
+    let hostname = regex::Regex::new(r"^[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63})*$").expect("static regex");
     if hostname.is_match(value) {
         return true;
     }
@@ -892,13 +899,13 @@ fn read_sheet_rows(
     required: bool,
     errors: &mut Vec<String>,
 ) -> Vec<SheetRow> {
-    let Ok(worksheet) = book.get_sheet_by_name(sheet_name) else {
+    let Ok(worksheet) = book.sheet_by_name(sheet_name) else {
         if required {
             errors.push(format!("Missing required worksheet \u{201c}{sheet_name}\u{201d}"));
         }
         return Vec::new();
     };
-    let (highest_column, highest_row) = worksheet.get_highest_column_and_row();
+    let (highest_column, highest_row) = worksheet.highest_column_and_row();
     // Header index: lowercase header → column number (first one wins).
     let mut indexes: std::collections::HashMap<String, u32> = Default::default();
     for column in 1..=highest_column {

@@ -44,6 +44,7 @@ pub struct UpdateService {
     pub emitter: crate::services::Emitter,
     pub status: Arc<parking_lot::Mutex<Value>>,
     pub rate_window: Arc<parking_lot::Mutex<(Instant, u64, f64)>>,
+    downloaded_bytes: std::sync::Arc<parking_lot::Mutex<Option<Vec<u8>>>>,
 }
 
 impl UpdateService {
@@ -53,6 +54,7 @@ impl UpdateService {
             emitter,
             status: Arc::new(parking_lot::Mutex::new(Self::idle_status())),
             rate_window: Arc::new(parking_lot::Mutex::new((Instant::now(), 0, 0.0))),
+            downloaded_bytes: std::sync::Arc::new(parking_lot::Mutex::new(None)),
         }
     }
 
@@ -71,9 +73,10 @@ impl UpdateService {
     }
 
     pub fn state(&self) -> Value {
+        let can_install = self.status.lock().get("downloaded").and_then(Value::as_bool).unwrap_or(false);
         let mut status = self.status.lock().clone();
         if let Value::Object(map) = &mut status {
-            map.insert("canInstall".into(), json!(status.get("downloaded").and_then(Value::as_bool).unwrap_or(false)));
+            map.insert("canInstall".into(), json!(can_install));
             map.insert("isPackaged".into(), json!(!cfg!(debug_assertions)));
         }
         status
@@ -253,7 +256,7 @@ impl UpdateService {
         self.emit(json!({ "type": "progress", "percent": 0, "transferred": 0, "total": 0, "remaining": 0, "bytesPerSecond": 0, "etaSeconds": Value::Null }));
 
         let service = self.clone();
-        let task = tauri::async_runtime::spawn(async move {
+        let mut task = tauri::async_runtime::spawn(async move {
             let updater = service.app.updater().map_err(|error| AppError::new(error.to_string()))?;
             let update = updater
                 .check()
@@ -264,7 +267,8 @@ impl UpdateService {
             };
             let version = update.current_version.clone();
             let tracker = service.clone();
-            update
+            // Plugin >= 2.11 hands back the verified payload on success.
+            let bytes = update
                 .download(
                     move |chunk: usize, total: Option<u64>| {
                         tracker.register_chunk(chunk as u64, total);
@@ -273,6 +277,7 @@ impl UpdateService {
                 )
                 .await
                 .map_err(|error| AppError::new(error.to_string()))?;
+            *service.downloaded_bytes.lock() = Some(bytes);
             Ok(version)
         });
 
@@ -306,8 +311,9 @@ impl UpdateService {
                             Err(AppError::new(message))
                         }
                         Err(join_error) => {
-                            // The task itself was aborted — treat like a pause.
-                            if cancel.load(std::sync::atomic::Ordering::Relaxed) || join_error.is_cancelled() {
+                            // JoinHandle::await yields tauri::Error (no
+                            // is_cancelled); aborts are signalled via the flag.
+                            if cancel.load(std::sync::atomic::Ordering::Relaxed) {
                                 return Ok(self.state());
                             }
                             Err(AppError::new(format!("The update download failed: {join_error}")))
@@ -378,6 +384,7 @@ impl UpdateService {
             if !status.get("paused").and_then(Value::as_bool).unwrap_or(false) {
                 return Err(AppError::new("Nothing is paused"));
             }
+            let mut status = self.status.lock();
             status["paused"] = json!(false);
         }
         self.emit(json!({ "type": "resumed" }));
@@ -409,9 +416,27 @@ impl UpdateService {
         let Some(update) = update else {
             return Err(AppError::new("No update is currently published"));
         };
-        tauri::async_runtime::spawn(async move {
-            let _ = update.install().await;
-        });
+        let bytes = self.downloaded_bytes.lock().clone();
+        match bytes {
+            Some(bytes) => {
+                // Verified payload already staged by download() — hand it to
+                // the plugin installer, which replaces the app and restarts.
+                update
+                    .install(&bytes)
+                    .map_err(|error| AppError::new(format!("Failed to install the update: {error}")))?;
+            }
+            None => {
+                // Fallback: fetch now, then install (same end state as the
+                // Electron quitAndInstall() flow).
+                let fetched = update
+                    .download(|_, _| {}, || {})
+                    .await
+                    .map_err(|error| AppError::new(format!("Failed to fetch the update: {error}")))?;
+                update
+                    .install(&fetched)
+                    .map_err(|error| AppError::new(format!("Failed to install the update: {error}")))?;
+            }
+        }
         Ok(json!({ "success": true }))
     }
 }

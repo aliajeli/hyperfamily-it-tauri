@@ -372,16 +372,14 @@ impl SoftwareService {
                     }
                 }
             });
-            let copy_outcome = {
-                let progress_tx = progress_tx.clone();
-                let outcome = stream_copy(&source_path, &target_path, total, move |written, total_bytes| {
-                    let _ = progress_tx.send((written, total_bytes));
-                }, 15 * 60 * 1000)
-                .await;
-                drop(progress_tx);
-                let _ = drain.await;
-                outcome
-            };
+            // Moving the sender into the copy closure keeps exactly one live
+            // sender; when stream_copy finishes the channel closes and the
+            // drain task exits on its own.
+            let copy_outcome = stream_copy(&source_path, &target_path, total, move |written, total_bytes| {
+                let _ = progress_tx.send((written, total_bytes));
+            }, 15 * 60 * 1000)
+            .await;
+            let _ = drain.await;
             if let Err(error) = copy_outcome {
                 results.push(json!({ "source": source_text, "target": target, "bytes": 0, "state": "error", "error": error.message }));
                 emit_step("error", json!({ "percent": 0, "error": error.message }));

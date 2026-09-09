@@ -30,7 +30,16 @@ impl std::error::Error for AppError {}
 
 impl Serialize for AppError {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.message)
+        // Electron's invoke rejections carried an Error with `.message` (and
+        // ad-hoc extras); keep that shape: `{ message }` plus the structured
+        // payload when one was attached (e.g. FORTICLIENT_MISSING).
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("AppError", if self.payload.is_some() { 2 } else { 1 })?;
+        state.serialize_field("message", &self.message)?;
+        if let Some(payload) = &self.payload {
+            state.serialize_field("payload", payload)?;
+        }
+        state.end()
     }
 }
 
@@ -83,6 +92,30 @@ impl From<rusqlite::Error> for AppError {
             return Self::new("Only one Router can be defined for each branch");
         }
         Self { message: text, payload: None }
+    }
+}
+
+impl From<bcrypt::BcryptError> for AppError {
+    fn from(value: bcrypt::BcryptError) -> Self {
+        Self { message: format!("Password hashing failed: {value}"), payload: None }
+    }
+}
+
+impl From<serde_json::Error> for AppError {
+    fn from(value: serde_json::Error) -> Self {
+        Self { message: format!("Malformed JSON data: {value}"), payload: None }
+    }
+}
+
+impl From<openssl::error::ErrorStack> for AppError {
+    fn from(value: openssl::error::ErrorStack) -> Self {
+        Self { message: format!("Encryption backend failed: {value}"), payload: None }
+    }
+}
+
+impl From<base64::DecodeError> for AppError {
+    fn from(value: base64::DecodeError) -> Self {
+        Self { message: format!("Malformed encoded payload: {value}"), payload: None }
     }
 }
 

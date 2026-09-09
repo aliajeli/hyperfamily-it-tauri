@@ -142,14 +142,16 @@ impl TerminalService {
 
         let emitter = self.emitter.clone();
         let session_id_for_worker = session_id.clone();
+        let host_for_worker = host.clone();
+        let username_for_worker = username.clone();
         let spawn_result = std::thread::Builder::new()
             .name(format!("terminal-{session_id}"))
             .spawn(move || match transport {
                 Transport::Ssh => ssh_worker(
                     &session_id_for_worker,
-                    &host,
+                    &host_for_worker,
                     port,
-                    &username,
+                    &username_for_worker,
                     &password,
                     cols,
                     rows,
@@ -158,9 +160,9 @@ impl TerminalService {
                 ),
                 Transport::Telnet => telnet_worker(
                     &session_id_for_worker,
-                    &host,
+                    &host_for_worker,
                     port,
-                    &username,
+                    &username_for_worker,
                     &password,
                     cols,
                     rows,

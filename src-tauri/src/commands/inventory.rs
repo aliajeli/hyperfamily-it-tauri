@@ -6,14 +6,14 @@ use serde_json::Value;
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 
-#[tauri::command(rename = "inventory:list")]
-pub async fn list(state: State<'_, AppState>) -> CmdResult {
+#[tauri::command]
+pub async fn inventory_list(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
     run_value(move || state.database.list_inventory().map(|rows| Value::Array(rows)))
 }
 
-#[tauri::command(rename = "inventory:export")]
-pub async fn export(app: tauri::AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
+#[tauri::command]
+pub async fn inventory_export(app: tauri::AppHandle, state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let _ = state.actor()?;
     let filters = payload.unwrap_or_default();
     let branch = filters.get("branch").and_then(Value::as_str).unwrap_or("all");

@@ -184,9 +184,9 @@ impl StoreAgentService {
                 && list.last().map(|last| last.get("progress").map(|value| !value.is_null()).unwrap_or(false) && last.get("step").and_then(Value::as_str) == Some(step)).unwrap_or(false);
             if replace {
                 let length = list.len();
-                list[length - 1] = entry;
+                list[length - 1] = entry.clone();
             } else {
-                list.push(entry);
+                list.push(entry.clone());
             }
             if let Some(emitter) = emitter {
                 let mut event = json!({ "checkoutId": checkout_id, "name": name });
@@ -212,7 +212,7 @@ impl StoreAgentService {
             let host = normalize_host(reachable.get("host").and_then(Value::as_str).unwrap_or(&requested))?;
             let key = host.to_lowercase();
             {
-                let locks = self.locks.lock();
+                let mut locks = self.locks.lock();
                 if locks.contains_key(&key) {
                     return Err(AppError::new("An agent import is already running on this checkout"));
                 }

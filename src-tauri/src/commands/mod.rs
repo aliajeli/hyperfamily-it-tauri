@@ -30,7 +30,7 @@ use crate::services::smb::SmbSessionManager;
 use crate::services::store_agent::StoreAgentService;
 use crate::services::store_update::StoreUpdateService;
 use crate::services::terminal::TerminalService;
-use crate::services::update::UpdateService;
+use crate::services::updater::UpdateService;
 use crate::services::vault::SecureVault;
 use crate::services::vpn::VpnService;
 use serde_json::Value;

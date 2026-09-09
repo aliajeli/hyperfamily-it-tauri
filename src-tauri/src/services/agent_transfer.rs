@@ -2,7 +2,7 @@
 //! and copying with idle/max deadlines and live progress formatting.
 
 use crate::error::{AppError, AppResult};
-use serde_json::{json, Value};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::time::Instant;
@@ -118,6 +118,7 @@ pub async fn copy_file(source: &Path, destination: &Path, label: &str, on_progre
         let deadline_failed: std::sync::Arc<parking_lot::Mutex<Option<String>>> = Default::default();
         let report_progress = {
             let written = written.clone();
+            let label = label.clone();
             move || {
                 let so_far = written.load(std::sync::atomic::Ordering::Relaxed);
                 let elapsed = started.elapsed().as_millis() as u64;

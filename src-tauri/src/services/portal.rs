@@ -93,10 +93,15 @@ fn urlencode(value: &str) -> String {
 }
 
 async fn portal_request_with(gateway: &str, port: u16, body: &str, profile: &TlsProfile) -> Result<RawReply, String> {
+    // Owned copies: the blocking task must not borrow function locals.
+    let owned = OwnedProfile {
+        min_version: profile.min_version,
+        ciphers: profile.ciphers.map(String::from),
+    };
     let gateway = gateway.to_string();
     let body = body.to_string();
     tokio::task::spawn_blocking(move || -> Result<RawReply, String> {
-        use std::io::{Read, Write};
+        use std::io::Write;
         use std::net::TcpStream;
 
         let tcp = TcpStream::connect((gateway.as_str(), port))
@@ -104,7 +109,7 @@ async fn portal_request_with(gateway: &str, port: u16, body: &str, profile: &Tls
         tcp.set_read_timeout(Some(std::time::Duration::from_secs(20))).ok();
         tcp.set_write_timeout(Some(std::time::Duration::from_secs(20))).ok();
 
-        let connector = build_connector(profile)?;
+        let connector = build_connector(&owned)?;
         let mut tls = connector
             .connect(&gateway, tcp)
             .map_err(|error| format!("handshake failed with {gateway}: {error}"))?;
@@ -122,7 +127,13 @@ async fn portal_request_with(gateway: &str, port: u16, body: &str, profile: &Tls
     .map_err(|error| format!("portal task failed: {error}"))?
 }
 
-fn build_connector(profile: &TlsProfile) -> Result<openssl::ssl::SslConnector, String> {
+/// Owned, Send profile data handed to the blocking task.
+struct OwnedProfile {
+    min_version: Option<openssl::ssl::SslVersion>,
+    ciphers: Option<String>,
+}
+
+fn build_connector(profile: &OwnedProfile) -> Result<openssl::ssl::SslConnector, String> {
     let mut builder = openssl::ssl::SslConnector::builder(openssl::ssl::SslMethod::tls())
         .map_err(|error| error.to_string())?;
     // The appliance certificate is never inspected for this diagnostic; the
@@ -131,13 +142,8 @@ fn build_connector(profile: &TlsProfile) -> Result<openssl::ssl::SslConnector, S
     if let Some(min_version) = profile.min_version {
         builder.set_min_proto_version(Some(min_version)).map_err(|error| error.to_string())?;
     }
-    if let Some(ciphers) = profile.ciphers {
+    if let Some(ciphers) = &profile.ciphers {
         builder.set_cipher_list(ciphers).map_err(|error| format!("{error} (cipher list: {ciphers})"))?;
-    }
-    if let Some(curves) = profile.curves {
-        if curves != "auto" {
-            let _ = builder.set_curves(curves);
-        }
     }
     Ok(builder.build())
 }
@@ -263,7 +269,7 @@ fn format_reply(reply: RawReply) -> Value {
         .filter_map(|item| item.as_str())
         .map(|item| item.split(';').next().unwrap_or("").to_string())
         .filter(|cookie| cookie.split_once('=').map(|(_, value)| !value.trim().is_empty()).unwrap_or(false))
-        .map(json)
+        .map(|item| json!(item))
         .collect();
     let cookie = cookies
         .iter()
