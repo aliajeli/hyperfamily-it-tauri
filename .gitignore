@@ -1,0 +1,23 @@
+# Node
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/
+
+# Native agent build outputs
+agent/build/
+src-tauri/resources/agent/*.exe
+
+# Local env & keys
+.env
+.env.*
+*.local
+~/.tauri/
+
+# OS
+Thumbs.db
+.DS_Store

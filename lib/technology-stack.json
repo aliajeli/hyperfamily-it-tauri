@@ -1,0 +1,194 @@
+[
+  {
+    "name": "Next.js",
+    "description": "Static App Router UI",
+    "package": "next",
+    "brand": "#000000",
+    "brandDark": "#8FBCBB",
+    "showMajor": true
+  },
+  {
+    "name": "React",
+    "description": "Component rendering",
+    "package": "react",
+    "brand": "#087EA4",
+    "brandDark": "#61DAFB",
+    "showMajor": true
+  },
+  {
+    "name": "Electron",
+    "description": "Windows desktop shell",
+    "package": "electron",
+    "brand": "#2B2E3A",
+    "brandDark": "#9FEAF9",
+    "showMajor": true
+  },
+  {
+    "name": "Node.js",
+    "description": "Main-process runtime",
+    "package": null,
+    "brand": "#417E38",
+    "brandDark": "#A3BE8C",
+    "showMajor": false
+  },
+  {
+    "name": "Tailwind CSS",
+    "description": "Themeable design system",
+    "package": "tailwindcss",
+    "brand": "#0891B2",
+    "brandDark": "#7DD3FC",
+    "showMajor": false
+  },
+  {
+    "name": "Radix UI",
+    "description": "Accessible UI primitives",
+    "package": "@radix-ui/react-dialog",
+    "brand": "#111827",
+    "brandDark": "#A3AEC2",
+    "showMajor": false
+  },
+  {
+    "name": "Framer Motion",
+    "description": "Interface motion",
+    "package": "framer-motion",
+    "brand": "#BB4B96",
+    "brandDark": "#E879C4",
+    "showMajor": true
+  },
+  {
+    "name": "Zustand",
+    "description": "Client state",
+    "package": "zustand",
+    "brand": "#7A5233",
+    "brandDark": "#C79A6B",
+    "showMajor": false
+  },
+  {
+    "name": "Recharts",
+    "description": "Live response charts",
+    "package": "recharts",
+    "brand": "#138C94",
+    "brandDark": "#5FD8E0",
+    "showMajor": false
+  },
+  {
+    "name": "React Hook Form + Zod",
+    "description": "Forms and validation",
+    "package": "react-hook-form",
+    "brand": "#BE4569",
+    "brandDark": "#F89AB5",
+    "showMajor": false
+  },
+  {
+    "name": "Lucide Icons",
+    "description": "Interface iconography",
+    "package": "lucide-react",
+    "brand": "#C74646",
+    "brandDark": "#FCA5A5",
+    "showMajor": false
+  },
+  {
+    "name": "Sonner",
+    "description": "Toast notifications",
+    "package": "sonner",
+    "brand": "#374151",
+    "brandDark": "#CBD5E1",
+    "showMajor": false
+  },
+  {
+    "name": "Encrypted SQLite",
+    "description": "SQLCipher · local data",
+    "package": "better-sqlite3-multiple-ciphers",
+    "brand": "#0F80CC",
+    "brandDark": "#6FC3F7",
+    "showMajor": false
+  },
+  {
+    "name": "Windows DPAPI",
+    "description": "OS-backed secret storage",
+    "package": null,
+    "brand": "#0078D4",
+    "brandDark": "#69B7F0",
+    "showMajor": false
+  },
+  {
+    "name": "AES-256-GCM",
+    "description": "Secret-storage fallback",
+    "package": null,
+    "brand": "#537D50",
+    "brandDark": "#A3BE8C",
+    "showMajor": false
+  },
+  {
+    "name": "bcryptjs",
+    "description": "Login password hashing",
+    "package": "bcryptjs",
+    "brand": "#967224",
+    "brandDark": "#EBCB8B",
+    "showMajor": false
+  },
+  {
+    "name": "ssh2",
+    "description": "In-app SSH terminal",
+    "package": "ssh2",
+    "brand": "#4C8B2B",
+    "brandDark": "#A3BE8C",
+    "showMajor": false
+  },
+  {
+    "name": "ExcelJS",
+    "description": "Inventory workbooks",
+    "package": "exceljs",
+    "brand": "#1D6F42",
+    "brandDark": "#6FCF97",
+    "showMajor": false
+  },
+  {
+    "name": "C++17 / Win32",
+    "description": "Native Windows Agent",
+    "package": null,
+    "brand": "#00599C",
+    "brandDark": "#74B4E8",
+    "showMajor": false
+  },
+  {
+    "name": "SMB / Windows SCM",
+    "description": "Admin shares and services",
+    "package": null,
+    "brand": "#0078D4",
+    "brandDark": "#69B7F0",
+    "showMajor": false
+  },
+  {
+    "name": "SHA-256",
+    "description": "Deployment file verification",
+    "package": null,
+    "brand": "#537D50",
+    "brandDark": "#A3BE8C",
+    "showMajor": false
+  },
+  {
+    "name": "electron-updater",
+    "description": "Desktop update delivery",
+    "package": "electron-updater",
+    "brand": "#7159A5",
+    "brandDark": "#BCA1E6",
+    "showMajor": false
+  },
+  {
+    "name": "electron-builder / NSIS",
+    "description": "Windows installer build",
+    "package": "electron-builder",
+    "brand": "#7159A5",
+    "brandDark": "#BCA1E6",
+    "showMajor": false
+  },
+  {
+    "name": "CMake / MSVC",
+    "description": "Native Agent build tools",
+    "package": null,
+    "brand": "#386C91",
+    "brandDark": "#86B9DD",
+    "showMajor": false
+  }
+]

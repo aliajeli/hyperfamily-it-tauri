@@ -1,0 +1,2 @@
+#pragma once
+namespace hf { inline constexpr wchar_t agentVersion[] = L"@AGENT_VERSION@"; }

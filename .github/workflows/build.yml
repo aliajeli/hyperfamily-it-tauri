@@ -1,0 +1,97 @@
+name: Build & Release (Windows)
+
+# Builds the Windows installer on every push to main and every version tag.
+# On a tag push it also:
+#   1. builds the native store agent (CMake),
+#   2. produces the NSIS installer + updater artifacts (.sig / latest.json),
+#   3. publishes everything to the GitHub release for that tag — which is the
+#      feed the in-app updater reads (releases/latest/download/latest.json).
+#
+# One-time setup (repo owner):
+#   npm run tauri signer generate -w ~/.tauri/hyperfamily.key
+#   -> put the PRIVATE key in the TAURI_SIGNING_PRIVATE_KEY secret
+#      (and its password in TAURI_SIGNING_PRIVATE_KEY_PASSWORD)
+#   -> paste the contents of ~/.tauri/hyperfamily.key.pub into
+#      src-tauri/tauri.conf.json -> plugins.updater.pubkey
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Build native store agent
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          powershell -ExecutionPolicy Bypass -File scripts/build-agent.ps1 -Version "$version"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Build frontend (static export)
+        run: npm run build
+
+      - name: Type-check Rust (clippy)
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+        continue-on-error: true
+
+      - name: Build app (debug smoke build on non-release runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        working-directory: src-tauri
+        run: cargo build
+
+      - name: Build installer + updater artifacts (release tags)
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npm run build:tauri -- --target x86_64-pc-windows-msvc
+
+      - name: Inspect installer size (informational)
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        shell: pwsh
+        run: |
+          Get-ChildItem src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe |
+            ForEach-Object { "{0}  {1:N0} bytes" -f $_.Name, $_.Length }
+
+      - name: Attach artifacts to the release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/updater/latest.json
+          fail_on_unmatched_files: true

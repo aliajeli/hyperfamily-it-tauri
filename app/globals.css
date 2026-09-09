@@ -1,0 +1,601 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -----------------------------------------------------------------------------
+   Theme transition (v2.0.18).
+
+   lib/themes.js swaps themes through document.startViewTransition(), so the
+   browser snapshots the whole window twice and crossfades the old palette into
+   the new one. One second for both directions of the blend: every element —
+   background, cards, text, borders — starts and finishes together, with
+   nothing changing before or after the rest.
+   -------------------------------------------------------------------------- */
+::view-transition-group(root) {
+  animation-duration: 1s;
+  animation-timing-function: cubic-bezier(.4, 0, .2, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: theme-old-fade;
+}
+
+::view-transition-new(root) {
+  animation-name: theme-new-fade;
+}
+
+@keyframes theme-old-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes theme-new-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 1ms;
+  }
+}
+
+/* The settings tab panels glide in rather than snapping. */
+@keyframes tab-panel-in {
+  from { opacity: 0; transform: translateY(6px) scale(.995); }
+  to { opacity: 1; transform: none; }
+}
+
+:root,
+[data-theme='aurora'] {
+  --primary: 191 97 106;
+  --secondary: 208 135 112;
+  --accent: 235 203 139;
+  --canvas: 229 233 240;
+  --surface: 236 239 244;
+  --text: 46 52 64;
+  --muted: 76 86 106;
+  --border: 216 222 233;
+  --focus: 191 97 106;
+}
+
+:root {
+  /* Terminal palette. lib/terminal-emulator.js emits these identifiers for SGR
+     colours; the dark override below keeps output legible on dark themes. */
+  --ansi-black: #3B4252;
+  --ansi-red: #BF616A;
+  --ansi-green: #6E9B57;
+  --ansi-yellow: #B58900;
+  --ansi-blue: #5E81AC;
+  --ansi-magenta: #9A6DA0;
+  --ansi-cyan: #4C93A4;
+  --ansi-white: #4C566A;
+  --ansi-bright-black: #6B7793;
+  --ansi-bright-red: #D0616A;
+  --ansi-bright-green: #7FAF62;
+  --ansi-bright-yellow: #C79A22;
+  --ansi-bright-blue: #6C90BE;
+  --ansi-bright-magenta: #B07EB6;
+  --ansi-bright-cyan: #57A5B8;
+  --ansi-bright-white: #2E3440;
+}
+
+:root[data-color-mode='dark'] {
+  --ansi-black: #3B4252;
+  --ansi-red: #BF616A;
+  --ansi-green: #A3BE8C;
+  --ansi-yellow: #EBCB8B;
+  --ansi-blue: #81A1C1;
+  --ansi-magenta: #B48EAD;
+  --ansi-cyan: #88C0D0;
+  --ansi-white: #E5E9F0;
+  --ansi-bright-black: #4C566A;
+  --ansi-bright-red: #D08770;
+  --ansi-bright-green: #B9D2A1;
+  --ansi-bright-yellow: #F0D399;
+  --ansi-bright-blue: #9DB8D4;
+  --ansi-bright-magenta: #C7A5C2;
+  --ansi-bright-cyan: #A3D5E0;
+  --ansi-bright-white: #ECEFF4;
+}
+
+/* Every other palette is applied at runtime from lib/themes.js as inline
+   custom properties on <html>, so new themes need no CSS changes. */
+
+/* ---------------------------------------------------------------------------
+   Typography groups. lib/typography.js writes --font-<group> (a font stack)
+   and --font-<group>-scale (a multiplier) onto <html>; both have neutral
+   defaults so an untouched install renders exactly as before. The whole-app
+   scale is applied as the root font size, so rem-based spacing grows with it.
+   --------------------------------------------------------------------------- */
+:root {
+  --font-header: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-title: var(--font-header);
+  --font-text: var(--font-header);
+  --font-info: var(--font-text);
+  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --font-header-scale: 1;
+  --font-title-scale: 1;
+  --font-text-scale: 1;
+  --font-info-scale: 1;
+  --font-mono-scale: 1;
+}
+
+* { border-color: rgb(var(--border)); }
+html {
+  background: rgb(var(--canvas));
+  /* `clip` rather than `hidden`: it suppresses sideways overflow WITHOUT
+     turning the root into a scroll container, so position:sticky headers and
+     scroll-into-view keep working. */
+  overflow-x: clip;
+  max-width: 100%;
+}
+body {
+  min-height: 100vh;
+  overflow-x: clip;
+  max-width: 100%;
+  /* Isolation makes body its own stacking context: the theme-swap iris
+     (a fixed child with z-index -1, see lib/themes.js) then paints ABOVE
+     the body background but BELOW every element of the interface, so the
+     whole effect plays out in the background of the app. */
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 86% -15%, rgb(var(--secondary) / .18), transparent 30rem),
+    radial-gradient(circle at 10% 110%, rgb(var(--primary) / .12), transparent 34rem),
+    rgb(var(--canvas));
+  background-size: 112% 112%, 115% 115%, auto;
+  animation: ambient-background 18s ease-in-out infinite alternate;
+  color: rgb(var(--text));
+  font-family: var(--font-text);
+  font-size: calc(1rem * var(--font-text-scale));
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Typeface per group. Wrapped in :where() so the specificity is zero and any
+   utility class on the element still wins. */
+:where(h1, .page-title, .app-header-title) { font-family: var(--font-header); }
+:where(h2, h3, h4, h5, h6, .card-title, .section-title) { font-family: var(--font-title); }
+:where(small, .page-subtitle, .field-label, .info-text, figcaption) { font-family: var(--font-info); }
+:where(code, kbd, samp, pre, .font-mono) { font-family: var(--font-mono); }
+button, input, select, textarea { font: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid rgb(var(--focus));
+  outline-offset: 2px;
+}
+::selection { background: rgb(var(--primary) / .25); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(var(--muted) / .25); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+
+@layer components {
+  /* ------------------------------------------------------------- app shell
+     The navigation rail, the header offset and the content margin are all
+     driven by the single --rail custom property set on .app-shell. Keeping
+     them on one variable (in rem, so it tracks the interface scale) is what
+     prevents the rail from overlapping page content at scales below 100 %.
+     Below the md breakpoint the rail is hidden, so no offset is applied. */
+  .app-shell { --rail: 14rem; }
+  .app-rail {
+    width: var(--rail);
+    transition: width .34s cubic-bezier(.22, 1, .36, 1);
+  }
+  .app-main,
+  .app-header { transition: margin-left .34s cubic-bezier(.22, 1, .36, 1), left .34s cubic-bezier(.22, 1, .36, 1); }
+  @media (min-width: 768px) {
+    .app-main { margin-left: var(--rail); }
+    .app-header { left: var(--rail); }
+  }
+  /* Nothing inside the shell may spill sideways past its own column. */
+  .app-main { min-width: 0; max-width: 100%; overflow-x: clip; }
+
+  /* ------------------------------------------------- no horizontal scroll
+     A page must never scroll sideways. Three things cause it in practice, so
+     all three are neutralised structurally rather than page by page:
+
+     1. A flex/grid ITEM defaults to min-width:auto, which refuses to shrink
+        below its content. Long device names, IPs and URLs then push the whole
+        layout wider than the viewport. Resetting min-width on the shell's
+        descendants lets them shrink and wrap instead.
+     2. Replaced/native-wide elements (images, video, canvas, tables, pre)
+        carry an intrinsic width that ignores the column.
+     3. Genuinely wide content — a data table — must scroll INSIDE its own
+        container, never by moving the page.
+
+     Interactive overlays are excluded: menus, dialogs and tooltips are
+     positioned outside the flow on purpose. */
+  .app-main :where(div, section, article, header, footer, form, label, p, span, li, td, th) {
+    min-width: 0;
+  }
+  .app-main :where(img, svg, video, canvas, iframe, webview) {
+    max-width: 100%;
+  }
+  .app-main :where(pre, table) {
+    max-width: 100%;
+  }
+  /* Long unbroken strings (paths, URLs, hashes) wrap instead of widening. */
+  .app-main :where(p, span, b, small, td, th, li, h1, h2, h3, h4) {
+    overflow-wrap: anywhere;
+  }
+  /* Any deliberately wide block scrolls within itself. */
+  .scroll-x {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .glass {
+    background: linear-gradient(145deg, rgb(var(--surface) / .84), rgb(var(--surface) / .64));
+    backdrop-filter: blur(18px) saturate(135%);
+    border: 1px solid rgb(var(--border) / .82);
+    box-shadow: 0 20px 60px rgb(46 52 64 / .09);
+  }
+  .panel { @apply glass rounded-2xl; }
+  /* The per-group size multipliers are applied here, in the components layer,
+     so a Tailwind text-* utility on the same element still overrides them. */
+  .page-title { @apply text-2xl font-bold tracking-tight md:text-3xl; font-size: calc(1.5rem * var(--font-header-scale)); }
+  .app-header-title { font-size: calc(1rem * var(--font-header-scale)); }
+  .card-title, .section-title { font-size: calc(1rem * var(--font-title-scale)); }
+  .page-subtitle { color: rgb(var(--muted)); @apply mt-1 text-sm; font-size: calc(.875rem * var(--font-info-scale)); }
+  .field-label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider; color: rgb(var(--muted)); font-size: calc(.75rem * var(--font-info-scale)); }
+  .info-text { font-size: calc(.6875rem * var(--font-info-scale)); }
+  .status-dot { @apply h-2.5 w-2.5 rounded-full; }
+  .gradient-text { background: linear-gradient(110deg, rgb(var(--primary)), rgb(var(--secondary))); background-clip: text; -webkit-background-clip: text; color: transparent; }
+}
+
+:root[data-color-mode='dark'] .glass { box-shadow: 0 22px 60px rgb(0 0 0 / .22); }
+.status-online-text { color: #5f7f4d; }
+.status-warning-text { color: #806823; }
+:root[data-color-mode='dark'] .status-online-text { color: #A3BE8C; }
+:root[data-color-mode='dark'] .status-warning-text { color: #EBCB8B; }
+
+.login-card {
+  box-shadow:
+    0 28px 80px rgb(46 52 64 / .13),
+    inset 0 1px 0 rgb(255 255 255 / .32);
+}
+.login-card-highlight {
+  background: linear-gradient(90deg, transparent, rgb(var(--primary) / .72), rgb(var(--secondary) / .62), transparent);
+  filter: blur(.2px);
+}
+.login-code-caret { animation: login-caret-blink .82s steps(1) infinite; }
+.login-button.login-button {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgb(255 255 255 / .16);
+  background: linear-gradient(110deg, rgb(var(--primary)), rgb(var(--primary)) 38%, rgb(var(--secondary)) 72%, rgb(var(--primary)));
+  background-size: 230% 100%;
+  color: white;
+  text-shadow: 0 1px 1px rgb(46 52 64 / .2);
+  box-shadow: 0 10px 26px rgb(var(--primary) / .22);
+  transition: background-position .55s cubic-bezier(.22, 1, .36, 1), box-shadow .35s ease, transform .25s ease, filter .25s ease;
+}
+.login-button.login-button::before {
+  content: '';
+  position: absolute;
+  inset: -2px auto -2px -45%;
+  z-index: 0;
+  width: 32%;
+  transform: skewX(-20deg);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / .5), transparent);
+  transition: left .58s cubic-bezier(.22, 1, .36, 1);
+}
+.login-button.login-button:hover {
+  background-position: 100% 0;
+  box-shadow: 0 14px 34px rgb(var(--primary) / .32), 0 0 0 4px rgb(var(--primary) / .09);
+  filter: saturate(1.12) brightness(1.06);
+}
+.login-button.login-button:hover::before { left: 118%; }
+.login-button.login-button:active {
+  box-shadow: 0 6px 18px rgb(var(--primary) / .2);
+}
+
+@keyframes login-caret-blink {
+  0%, 46% { opacity: 1; }
+  47%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .login-code-caret { animation: none; }
+}
+
+:root[data-color-mode='dark'] .login-card {
+  box-shadow: 0 30px 86px rgb(0 0 0 / .38), inset 0 1px 0 rgb(255 255 255 / .06);
+}
+
+.interactive-sheen { position: relative; isolation: isolate; overflow: hidden; }
+.interactive-sheen::after {
+  content: '';
+  position: absolute;
+  inset: -45% auto -45% -42%;
+  z-index: 0;
+  pointer-events: none;
+  width: 25%;
+  transform: rotate(16deg);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / .34), transparent);
+  opacity: 0;
+  transition: left .65s cubic-bezier(.22, 1, .36, 1), opacity .2s ease;
+}
+.interactive-sheen:hover::after { left: 118%; opacity: .85; }
+
+.branch-card {
+  box-shadow: 0 12px 32px rgb(46 52 64 / .07), inset 0 1px 0 rgb(255 255 255 / .22);
+  transition: border-color .32s ease, box-shadow .32s ease;
+}
+.branch-card:hover {
+  border-color: rgb(var(--primary) / .3);
+  box-shadow: 0 20px 46px rgb(46 52 64 / .13), 0 0 0 1px rgb(var(--primary) / .07);
+}
+.branch-title-button { transition: color .25s ease, background .25s ease, transform .25s ease; }
+.branch-title-button:hover { color: rgb(var(--primary)); background: rgb(var(--primary) / .07); transform: translateX(2px); }
+
+.device-card {
+  box-shadow: 0 5px 16px rgb(46 52 64 / .055), inset 0 1px 0 rgb(255 255 255 / .2);
+  transition: border-color .28s ease, box-shadow .28s ease, filter .28s ease;
+}
+.device-card:hover {
+  box-shadow: 0 13px 28px rgb(46 52 64 / .12), inset 0 1px 0 rgb(255 255 255 / .3);
+  filter: saturate(1.05);
+}
+.router-monitor-card {
+  transition: border-color .3s ease, box-shadow .3s ease, filter .3s ease;
+}
+.router-monitor-card:hover {
+  box-shadow: 0 15px 34px rgb(46 52 64 / .14);
+  filter: saturate(1.06);
+}
+
+.directory-step { transition: border-color .3s ease, background .3s ease, opacity .3s ease; }
+.device-directory-form .field-label,
+.branch-directory-form .field-label { margin-bottom: .25rem; font-size: .56rem; letter-spacing: .075em; }
+.device-directory-form input,
+.device-directory-form select,
+.branch-directory-form input { height: 2.25rem; border-radius: .625rem; font-size: .7rem; }
+.device-directory-form button,
+.branch-directory-form button { font-size: .7rem; }
+.device-directory-form h3 { font-size: .75rem; }
+.directory-branch-card,
+.directory-device-card,
+.device-type-option {
+  box-shadow: 0 7px 20px rgb(46 52 64 / .055), inset 0 1px 0 rgb(255 255 255 / .18);
+  transition: border-color .28s ease, box-shadow .28s ease, background .28s ease, filter .28s ease;
+}
+.directory-branch-card:hover,
+.directory-device-card:hover,
+.device-type-option:hover {
+  box-shadow: 0 16px 34px rgb(46 52 64 / .12), inset 0 1px 0 rgb(255 255 255 / .26);
+  filter: saturate(1.04);
+}
+
+.notification-count { animation: notification-pulse 2.2s ease-in-out infinite; }
+.notification-popup,
+.vpn-popup {
+  background: linear-gradient(145deg, rgb(var(--surface) / .98), rgb(var(--surface) / .94));
+  backdrop-filter: blur(24px) saturate(115%);
+  box-shadow: 0 26px 72px rgb(46 52 64 / .22), inset 0 1px 0 rgb(255 255 255 / .32);
+}
+.dashboard-dialog-overlay[data-state='open'] { animation: dashboard-overlay-in .28s ease-out both; }
+.dashboard-dialog-overlay[data-state='closed'] { animation: dashboard-overlay-out .2s ease-in both; }
+.dashboard-branch-modal[data-state='open'] { animation: dashboard-modal-in .48s cubic-bezier(.16, 1, .3, 1) both; }
+.dashboard-branch-modal[data-state='closed'] { animation: dashboard-modal-out .2s ease-in both; }
+.dashboard-branch-side[data-state='open'] { animation: dashboard-side-in .5s cubic-bezier(.16, 1, .3, 1) both; }
+.dashboard-branch-side[data-state='closed'] { animation: dashboard-side-out .24s ease-in both; }
+.dialog-overlay[data-state='open'] { animation: dashboard-overlay-in .25s ease-out both; }
+.dialog-overlay[data-state='closed'] { animation: dashboard-overlay-out .18s ease-in both; }
+.dialog-content[data-state='open'] { animation: dashboard-modal-in .4s cubic-bezier(.16, 1, .3, 1) both; }
+.dialog-content[data-state='closed'] { animation: dashboard-modal-out .18s ease-in both; }
+
+  /* Themed dropdown list. The panel springs open from the trigger edge and its
+     rows stagger in behind it, so the list reads as one connected surface
+     rather than a native menu pasted over the interface. */
+  .select-content[data-state='open'] { animation: select-in .26s cubic-bezier(.16, 1, .3, 1) both; transform-origin: var(--radix-select-content-transform-origin); }
+  .select-content[data-state='closed'] { animation: select-out .14s ease-in both; transform-origin: var(--radix-select-content-transform-origin); }
+  .select-content[data-state='open'] .select-item { animation: select-item-in .26s cubic-bezier(.16, 1, .3, 1) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .select-content[data-state='open'],
+    .select-content[data-state='open'] .select-item,
+    .select-content[data-state='closed'] { animation-duration: .01ms; }
+  }
+
+/* --------------------------------------------------------- About: contact card */
+.contact-card:hover {
+  border-color: rgb(var(--primary) / .5);
+  background: rgb(var(--primary) / .07);
+  box-shadow: 0 12px 30px rgb(var(--primary) / .16);
+  transform: translateY(-2px);
+}
+.contact-card:hover .contact-card-icon {
+  background: rgb(var(--primary));
+  color: #fff;
+  transform: scale(1.06) rotate(-4deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .contact-card, .contact-card-icon { transition-duration: .01ms; }
+  .contact-card:hover { transform: none; }
+}
+
+/* --------------------------------------------------- About: technology tiles
+   Each tile carries its technology's brand colour in --brand. At rest the grid
+   is calm and monochrome; on hover the colour washes in from the bottom-left,
+   the border and title adopt the brand hue and a soft tinted glow lifts the
+   tile. Everything animates on compositor-friendly properties only. */
+.tech-tile {
+  transition: border-color .38s cubic-bezier(.16, 1, .3, 1), box-shadow .38s cubic-bezier(.16, 1, .3, 1);
+  will-change: transform;
+}
+.tech-tile-wash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background:
+    radial-gradient(120% 120% at 0% 100%, var(--brand) 0%, transparent 62%),
+    linear-gradient(135deg, var(--brand) 0%, transparent 78%);
+  transition: opacity .42s cubic-bezier(.16, 1, .3, 1);
+  pointer-events: none;
+}
+.tech-tile:hover .tech-tile-wash { opacity: .16; }
+.tech-tile-name {
+  transition: color .34s cubic-bezier(.16, 1, .3, 1);
+}
+.tech-tile:hover { border-color: color-mix(in srgb, var(--brand) 58%, transparent); }
+.tech-tile:hover .tech-tile-name { color: var(--brand); }
+.tech-tile:hover { box-shadow: 0 14px 34px color-mix(in srgb, var(--brand) 26%, transparent); }
+
+/* Dark mode: the light brand variant keeps the text legible on a dark tile. */
+:root[data-color-mode='dark'] .tech-tile:hover .tech-tile-name { color: var(--brand-dark); }
+:root[data-color-mode='dark'] .tech-tile:hover { border-color: color-mix(in srgb, var(--brand-dark) 52%, transparent); }
+:root[data-color-mode='dark'] .tech-tile-wash {
+  background:
+    radial-gradient(120% 120% at 0% 100%, var(--brand-dark) 0%, transparent 62%),
+    linear-gradient(135deg, var(--brand-dark) 0%, transparent 78%);
+}
+:root[data-color-mode='dark'] .tech-tile:hover .tech-tile-wash { opacity: .2; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tech-tile, .tech-tile-wash, .tech-tile-name { transition-duration: .01ms; }
+}
+
+/* ------------------------------------------------------------------ z-order
+   One authoritative stacking scale for the whole application.
+
+   The Notification and VPN panels are anchored inside the header, so their
+   own `z-50` used to be trapped in the header's stacking context: any card in
+   the main column that gained a stacking context on hover (a transform, an
+   opacity change, a framer-motion `layout` animation) could paint straight
+   over an open panel. Raising the card's z-index would not help — it is being
+   compared against the *header*, not against the panel.
+
+   The fix is structural rather than cosmetic:
+     1. the header is lifted above the main column, so nothing inside main can
+        ever out-rank it, whatever it does on hover;
+     2. the panels are pinned to the top of the scale;
+     3. hover effects inside the main column are explicitly denied a z-index
+        that could compete.
+   ------------------------------------------------------------------------ */
+:root {
+  --z-rail: 30;
+  --z-header: 60;
+  /* Fullscreen surfaces deliberately cover the header — they replace the whole
+     screen — so they sit just above it, and still below dialogs. */
+  --z-fullscreen: 70;
+  --z-panel: 90;
+  --z-modal: 100;
+}
+
+/* The header outranks every page-level element, so a panel hanging off it is
+   compared against the main column as a whole and always wins. */
+.app-header { z-index: var(--z-header); }
+.app-rail { z-index: var(--z-rail); }
+/* The main column is deliberately left WITHOUT a stacking context. Giving it
+   one would trap genuinely-fullscreen surfaces (the terminal) underneath the
+   header. Page content stays below the header simply because nothing inside it
+   is allowed a z-index that reaches --z-header. */
+
+/* The two panels that must never be covered by anything. */
+.notification-popup,
+.vpn-popup {
+  z-index: var(--z-panel);
+  /* Own stacking context, so descendants cannot escape upward either. */
+  isolation: isolate;
+}
+
+/* A fullscreen surface (the terminal) escapes the main column's layer. */
+.surface-fullscreen { z-index: var(--z-fullscreen); }
+
+/* Cards animate with transform/shadow only. Denying them a positive z-index
+   keeps a hovered card from creating a layer that competes with the header,
+   which is exactly what let a branch card slide over an open panel. */
+.branch-card:hover,
+.device-card:hover,
+.router-monitor-card:hover,
+.directory-branch-card:hover,
+.directory-device-card:hover,
+.device-type-option:hover { z-index: 0; }
+
+:root[data-color-mode='dark'] .branch-card:hover,
+:root[data-color-mode='dark'] .device-card:hover,
+:root[data-color-mode='dark'] .router-monitor-card:hover,
+:root[data-color-mode='dark'] .directory-branch-card:hover,
+:root[data-color-mode='dark'] .directory-device-card:hover,
+:root[data-color-mode='dark'] .device-type-option:hover { box-shadow: 0 18px 42px rgb(0 0 0 / .3); }
+:root[data-color-mode='dark'] .notification-popup,
+:root[data-color-mode='dark'] .vpn-popup { box-shadow: 0 30px 80px rgb(0 0 0 / .46), inset 0 1px 0 rgb(255 255 255 / .06); }
+
+@keyframes ambient-background {
+  from { background-position: 100% 0, 0 100%, 0 0; }
+  to { background-position: 90% 8%, 8% 92%, 0 0; }
+}
+@keyframes notification-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 3px 8px rgb(191 97 106 / .25); }
+  50% { transform: scale(1.08); box-shadow: 0 3px 14px rgb(191 97 106 / .45); }
+}
+@keyframes dashboard-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dashboard-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes dashboard-modal-in {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(.94); filter: blur(5px); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+}
+@keyframes dashboard-modal-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -48%) scale(.97); }
+}
+@keyframes dashboard-side-in { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+@keyframes dashboard-side-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100%); } }
+
+@keyframes select-in {
+  from { opacity: 0; transform: scale(.94) translateY(-6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes select-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(.96); }
+}
+@keyframes select-item-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.recharts-cartesian-grid line { stroke: rgb(var(--border)); }
+.recharts-text { fill: rgb(var(--muted)); font-size: 10px; }
+.drag-region { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+
+/* Coordinated desktop density for the application's primary 1366×768 target.
+   Width remains fluid; the height query only removes excess chrome on shorter
+   monitors and never hides page content. */
+@media (min-width: 768px) and (max-height: 800px) {
+  .page-title { font-size: calc(1.35rem * var(--font-header-scale)); line-height: 1.7rem; }
+  .page-subtitle { margin-top: .15rem; font-size: calc(.72rem * var(--font-info-scale)); line-height: 1rem; }
+  .panel { border-radius: .85rem; }
+  .dialog-content { max-height: calc(100dvh - 1rem); }
+}
+
+/* 1366×768 is the primary deployment display. At that height the browser
+   chrome leaves roughly 620 px of page, so card padding and section gaps are
+   tightened to keep the common pages within one screen. Larger displays are
+   untouched and keep the roomier spacing. */
+@media (min-width: 1024px) and (max-height: 820px) {
+  .settings-dense .card-title { font-size: calc(.9rem * var(--font-title-scale)); }
+  .app-main .space-y-5 > * + * { margin-top: .85rem; }
+  .app-main .space-y-4 > * + * { margin-top: .7rem; }
+  .app-main .space-y-3 > * + * { margin-top: .6rem; }
+
+  /* The sticky header is 56px tall but the shell reserves 72px above the
+     content. On a 768px screen that slack is the difference between fitting
+     and scrolling, so it is reclaimed here (and only here). The doubled
+     class raises specificity above the Tailwind padding utility. */
+  .app-main.app-main { padding-top: 60px; padding-bottom: .625rem; }
+}
+
+@media (max-height: 680px) {
+  .login-card { margin-block: .75rem; }
+}
