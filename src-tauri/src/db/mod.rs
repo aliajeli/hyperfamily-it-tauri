@@ -94,6 +94,8 @@ pub struct AppDatabase {
     pub recovery_file_path: Option<PathBuf>,
 }
 
+// Shape kept 1:1 with the Electron session object for bridge parity.
+#[allow(dead_code)]
 pub struct SessionUser {
     pub id: i64,
     pub username: String,
@@ -1677,6 +1679,7 @@ impl AppDatabase {
     }
 
     /// Binds convenience wrapper for statements executed with params above.
+#[allow(dead_code)]
     pub fn with_connection<T>(&self, task: impl FnOnce(&Connection) -> AppResult<T>) -> AppResult<T> {
         let connection = self.lock();
         task(&connection)

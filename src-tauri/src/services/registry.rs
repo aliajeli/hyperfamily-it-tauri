@@ -6,11 +6,15 @@
 use crate::error::{AppError, AppResult};
 use serde_json::{json, Value};
 
+// Remote-programs helpers from electron wmi-registry.service.js; the live
+// inventory path runs through store_update::list_installed_on.
+#[allow(dead_code)]
 pub const UNINSTALL_KEYS: [&str; 2] = [
     r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
     r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
 ];
 
+#[allow(dead_code)]
 struct RegRun {
     ok: bool,
     stdout: String,
@@ -18,12 +22,14 @@ struct RegRun {
     timed_out: bool,
 }
 
+#[allow(dead_code)]
 fn run_reg(args: &[String], timeout_ms: u64) -> RegRun {
     let outcome = crate::services::smb::run_command("reg.exe", args, timeout_ms);
     RegRun { ok: outcome.ok, stdout: outcome.stdout, stderr: outcome.stderr, timed_out: outcome.timed_out }
 }
 
 /// Parses `reg query ... /s` output into program rows.
+#[allow(dead_code)]
 pub fn parse_reg_query(output: &str) -> Vec<Value> {
     let mut programs: Vec<Value> = Vec::new();
     let mut current: Option<Value> = None;
@@ -72,6 +78,7 @@ pub fn parse_reg_query(output: &str) -> Vec<Value> {
     programs.into_iter().filter(|program| !program.get("name").and_then(Value::as_str).unwrap_or("").is_empty()).collect()
 }
 
+#[allow(dead_code)]
 fn fail(message: &str, code: &str) -> AppError {
     let mut error = AppError::new(message.to_string());
     error.message = format!("[{code}] {message}");
@@ -79,6 +86,7 @@ fn fail(message: &str, code: &str) -> AppError {
 }
 
 /// Every program registered on `host` ('' or 'localhost' → this machine).
+#[allow(dead_code)]
 pub async fn list_remote_programs(host: &str, timeout_ms: u64) -> AppResult<Vec<Value>> {
     let clean = host.trim().trim_start_matches('\\').to_string();
     let prefix = if !clean.is_empty() && !matches!(clean.to_lowercase().as_str(), "localhost" | "127.0.0.1" | ".") {
@@ -165,6 +173,7 @@ pub fn pick_program(programs: &[Value], needle: &str) -> Option<Value> {
 
 /// Fallback for when Remote Registry is stopped: copy the machine's SOFTWARE
 /// hive off \\host\C$ and read it locally with `reg load`.
+#[allow(dead_code)]
 pub async fn read_hive_over_share(host: &str, timeout_ms: u64) -> AppResult<Vec<Value>> {
     let clean = host.trim().trim_start_matches('\\').to_string();
     let candidates = vec![

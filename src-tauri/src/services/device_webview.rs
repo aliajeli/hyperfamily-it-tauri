@@ -14,6 +14,8 @@ pub struct DeviceWindowRegistry {
     pub windows: Mutex<HashMap<String, DeviceWindowMeta>>,
 }
 
+// Shape mirrors the Electron device-window state object.
+#[allow(dead_code)]
 pub struct DeviceWindowMeta {
     pub window: WebviewWindow,
     pub username: String,
@@ -258,6 +260,8 @@ pub fn broadcast_palette(palette: &Value) {
 }
 
 /// Closes a device window by its key (kind:deviceId).
+// Kept for parity; device windows self-close via their timeout lifecycle.
+#[allow(dead_code)]
 pub fn close_device_webview(kind: &str, device_id: &Value) -> bool {
     let key = format!("{kind}:{device_id}");
     let removed = registry().windows.lock().remove(&key);
@@ -269,4 +273,5 @@ pub fn close_device_webview(kind: &str, device_id: &Value) -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub type SharedRegistry = Arc<DeviceWindowRegistry>;

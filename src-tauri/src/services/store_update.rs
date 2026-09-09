@@ -613,7 +613,7 @@ async fn run_pipeline(
             async move {
                 let mut last = Instant::now() - Duration::from_secs(1);
                 while let Some((written, total)) = progress_rx.recv().await {
-                    let percent = if total > 0 { (written * 100 / total) as i64 } else { 100 };
+                    let percent = (written * 100).checked_div(total).map_or(100, |value| value as i64);
                     if written != total && last.elapsed() < Duration::from_millis(100) {
                         continue;
                     }

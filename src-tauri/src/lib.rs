@@ -230,7 +230,7 @@ fn start_ping_loop(app: tauri::AppHandle, emitter: services::Emitter) {
                 Ok(()) => {
                     let settings = database.get_settings().unwrap_or(Value::Null);
                     let interval = settings.get("ping_interval").and_then(Value::as_f64).unwrap_or(3.0);
-                    std::time::Duration::from_secs_f64((interval.max(1.0)))
+                    std::time::Duration::from_secs_f64(interval.max(1.0))
                 }
                 Err(error) => {
                     database.audit("System", "PING_SERVICE_ERROR", "Monitoring", &error.message);

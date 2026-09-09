@@ -302,6 +302,8 @@ impl SmbSessionManager {
     }
 
     /// Releases every session this process opened (called on app quit).
+// App-exit sweep from electron smb.service; sessions also expire lazily.
+#[allow(dead_code)]
     pub async fn release_all(&self) {
         let hosts: Vec<String> = self.sessions.lock().keys().cloned().collect();
         self.sessions.lock().clear();

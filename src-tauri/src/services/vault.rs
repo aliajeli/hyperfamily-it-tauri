@@ -184,8 +184,11 @@ impl SecureVault {
             return Ok(String::new());
         }
         if let Some(blob) = payload.strip_prefix("dpapi:") {
-            let _bytes = base64::engine::general_purpose::STANDARD.decode(blob.trim())
+            let bytes = base64::engine::general_purpose::STANDARD.decode(blob.trim())
                 .map_err(|e| AppError::new(format!("Invalid encrypted payload: {e}")))?;
+            // The decoded blob is consumed by the Windows branch only.
+            #[cfg(not(windows))]
+            let _ = &bytes;
             #[cfg(windows)]
             {
                 let plain = dpapi_unprotect(&bytes)?;

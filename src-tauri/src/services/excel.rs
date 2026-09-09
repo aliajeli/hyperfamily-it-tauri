@@ -17,6 +17,12 @@ use umya_spreadsheet::{
 const DEVICE_TYPES: [&str; 10] = ["Router", "Switch", "iLO", "Server", "NVR", "AccessPoint", "Scale", "Client", "Checkout", "POS"];
 pub const MAX_SWITCH_PORTS: usize = 48;
 
+/// Compiled once — the import loop validates many rows against both.
+static BRANCH_CODE_PATTERN: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"^[A-Za-z0-9_-]{2,20}$").expect("static regex"));
+static WAREHOUSE_CODE_PATTERN: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"^[A-Za-z0-9_-]{1,40}$").expect("static regex"));
+
 const BRANCH_HEADERS: [&str; 11] = [
     "Branch Name", "Branch Code", "Warehouse Code", "Link1", "IP Link1", "Link2", "IP Link2",
     "Manager Name", "Manager Tell", "Deputy Name", "Deputy Tell",
@@ -100,6 +106,8 @@ const FIELD_MAP: &[(&str, &str)] = &[
     ("Serial Number", "serial_number"),
 ];
 
+// Exposed for template docs; the header map drives the actual sheets.
+#[allow(dead_code)]
 pub fn device_types() -> &'static [&'static str; 10] {
     &DEVICE_TYPES
 }
@@ -223,12 +231,7 @@ fn style_sheet(worksheet: &mut umya_spreadsheet::Worksheet, headers: &[String]) 
 }
 
 fn find_header_column(worksheet: &mut umya_spreadsheet::Worksheet, header: &str, last_column: u32) -> Option<u32> {
-    for column in 1..=last_column {
-        if worksheet.value((column, 1)).trim().eq_ignore_ascii_case(header) {
-            return Some(column);
-        }
-    }
-    None
+    (1..=last_column).find(|&column| worksheet.value((column, 1)).trim().eq_ignore_ascii_case(header))
 }
 
 fn add_list_validation(worksheet: &mut umya_spreadsheet::Worksheet, header: &str, values: &[&str], last_column: u32) {
@@ -419,19 +422,13 @@ impl<'a> ExcelService<'a> {
             }
             if code.is_empty() {
                 errors.push(format!("{row_label}: Branch Code is required"));
-            } else {
-                let pattern = regex::Regex::new(r"^[A-Za-z0-9_-]{2,20}$").expect("static regex");
-                if !pattern.is_match(&code) {
-                    errors.push(format!("{row_label}: Branch Code must use 2-20 letters, numbers, dashes, or underscores"));
-                }
+            } else if !BRANCH_CODE_PATTERN.is_match(&code) {
+                errors.push(format!("{row_label}: Branch Code must use 2-20 letters, numbers, dashes, or underscores"));
             }
             if warehouse_code.is_empty() {
                 errors.push(format!("{row_label}: Warehouse Code is required"));
-            } else {
-                let pattern = regex::Regex::new(r"^[A-Za-z0-9_-]{1,40}$").expect("static regex");
-                if !pattern.is_match(&warehouse_code) {
-                    errors.push(format!("{row_label}: Warehouse Code must use up to 40 letters, numbers, dashes, or underscores"));
-                }
+            } else if !WAREHOUSE_CODE_PATTERN.is_match(&warehouse_code) {
+                errors.push(format!("{row_label}: Warehouse Code must use up to 40 letters, numbers, dashes, or underscores"));
             }
             let code_key = code.to_lowercase();
             let warehouse_key = warehouse_code.to_lowercase();

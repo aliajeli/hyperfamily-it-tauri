@@ -34,6 +34,7 @@ const TLS_PROFILES: [TlsProfile; 5] = [
 struct TlsProfile {
     min_version: Option<openssl::ssl::SslVersion>,
     ciphers: Option<&'static str>,
+    #[allow(dead_code)] // part of the 5-rung TLS profile table; consumed when needed
     curves: Option<&'static str>,
 }
 
@@ -242,7 +243,6 @@ fn decode_body(raw: &[u8]) -> String {
                 // Malformed framing: keep everything from here (the gateway
                 // answer still matters more than its framing discipline).
                 body.extend_from_slice(&raw[position..]);
-                position = raw.len();
                 break;
             }
         }

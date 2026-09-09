@@ -7,6 +7,9 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+// Legacy local inventory (electron software.service.js); store-update owns
+// the remote inventory path.
+#[allow(dead_code)]
 pub const LIST_INSTALLED_SCRIPT: &str = r#"
 $paths = @(
   'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
@@ -83,6 +86,7 @@ impl CreationFlagsNp for tokio::process::Command {
 }
 
 /// JSON output may arrive as a single object when exactly one program exists.
+#[allow(dead_code)]
 pub fn parse_installed_json(output: &str) -> Vec<Value> {
     let text = output.trim();
     if text.is_empty() {
@@ -191,10 +195,14 @@ pub fn require_windows(action: &str) -> AppResult<()> {
     }
 }
 
+#[allow(dead_code)]
 pub struct SoftwareService {
     cache: parking_lot::Mutex<(Option<Vec<Value>>, Instant)>,
 }
 
+// Local-inventory service retained from electron software.service.js; the
+// active paths use the free helpers below.
+#[allow(dead_code)]
 impl SoftwareService {
     pub fn new() -> Self {
         Self { cache: parking_lot::Mutex::new((None, Instant::now() - std::time::Duration::from_secs(3600))) }
@@ -363,7 +371,7 @@ impl SoftwareService {
                             continue;
                         }
                         last = Instant::now();
-                        let percent = if total_bytes > 0 { (written * 100 / total_bytes) as i64 } else { 100 };
+                        let percent = (written * 100).checked_div(total_bytes).map_or(100, |value| value as i64);
                         emit(
                             "software:copy-progress",
                             json!({ "index": index, "source": source_text, "target": target_text, "state": "progress",
@@ -426,6 +434,7 @@ impl SoftwareService {
 }
 
 /// PowerShell single-quoted literal; interior quotes are doubled.
+#[allow(dead_code)]
 pub fn ps_literal(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }

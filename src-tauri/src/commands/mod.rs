@@ -39,6 +39,7 @@ use std::sync::Arc;
 /// Everything a command may touch, shared behind `Arc`.
 pub struct AppState {
     pub database: Arc<AppDatabase>,
+    #[allow(dead_code)] // handle parity with Electron ipc-handlers; the db owns the live vault
     pub vault: Arc<SecureVault>,
     pub smb: Arc<SmbSessionManager>,
     pub store_update: Arc<StoreUpdateService>,
@@ -111,6 +112,8 @@ impl From<&str> for AppErrorBox {
 pub type CmdResult = Result<Value, String>;
 
 /// Runs a fallible closure through the friendly-error mapping.
+// Retained for future command authors; commands map errors inline today.
+#[allow(dead_code)]
 pub fn run<T, E>(task: impl FnOnce() -> Result<T, E>) -> CmdResult
 where
     E: Into<AppErrorBox>,
