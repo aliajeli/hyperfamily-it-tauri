@@ -215,6 +215,18 @@ impl TerminalService {
     }
 }
 
+/// Answers every keyboard-interactive prompt with the stored password —
+/// switches with `login:`/`Password:`-style challenges sign in unattended.
+struct PasswordPrompter<'a> {
+    password: &'a str,
+}
+
+impl<'a> ssh2::KeyboardInteractivePrompt for PasswordPrompter<'a> {
+    fn prompt<'b>(&mut self, _username: &str, _instructions: &str, prompts: &[ssh2::Prompt<'b>]) -> Vec<String> {
+        prompts.iter().map(|_| self.password.to_string()).collect()
+    }
+}
+
 fn friendly_error(message: &str) -> String {
     if message.contains("ECONNREFUSED") {
         return "Connection refused \u{2014} the service is not listening on that port".into();
@@ -243,7 +255,7 @@ fn report_data(emitter: &Emitter, session_id: &str, data: &[u8]) {
 /// the legacy switches in the field keep connecting.
 fn configure_legacy_preferences(session: &ssh2::Session) {
     use ssh2::MethodType;
-    let preferences: [(MethodType, &str); 7] = [
+    let preferences: [(MethodType, &str); 6] = [
         (
             MethodType::Kex,
             "curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256,diffie-hellman-group16-sha512,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1,diffie-hellman-group-exchange-sha1",
@@ -253,27 +265,25 @@ fn configure_legacy_preferences(session: &ssh2::Session) {
             "ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256,ssh-rsa,ssh-dss",
         ),
         (
-            MethodType::CryptCS,
+            MethodType::CryptCs,
             "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,aes192-cbc,aes256-cbc,3des-cbc",
         ),
         (
-            MethodType::CryptSC,
+            MethodType::CryptSc,
             "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,aes192-cbc,aes256-cbc,3des-cbc",
         ),
         (
-            MethodType::MacCS,
+            MethodType::MacCs,
             "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1",
         ),
         (
-            MethodType::MacSC,
+            MethodType::MacSc,
             "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1",
         ),
-        (MethodType::CompCS, "none"),
-    ];
+];
     for (kind, list) in preferences {
-        let Ok(mut methods) = ssh2::Methods::new() else { return };
-        methods.add_method(kind, list);
-        let _ = session.method_pref(kind, &methods);
+        // ssh2 0.9 takes the comma-separated preference list directly.
+        let _ = session.method_pref(kind, list);
     }
 }
 
@@ -298,15 +308,12 @@ fn ssh_worker(
         configure_legacy_preferences(&session);
         session.handshake().map_err(|error| AppError::new(friendly_error(&error.to_string())))?;
         if !session.authenticated() {
-            // Password first, then keyboard-interactive (the prompts are all
+            // Password first, then keyboard-interactive (every prompt is
             // answered with the stored password, like the Electron build).
             if session.userauth_password(username, password).is_err() {
-                let mut prompt_counter = 0usize;
+                let mut prompter = PasswordPrompter { password };
                 session
-                    .userauth_keyboard_interactive(username, Some(|_, _, _, prompts| {
-                        prompt_counter += prompts.len();
-                        prompts.iter().map(|_| password.to_string()).collect::<Vec<_>>()
-                    }))
+                    .userauth_keyboard_interactive(username, &mut prompter)
                     .map_err(|_| AppError::new("Authentication failed \u{2014} check the credential assigned to switches"))?;
             }
         }
@@ -315,7 +322,7 @@ fn ssh_worker(
         }
         let mut channel = session.channel_session().map_err(|error| AppError::new(error.to_string()))?;
         channel
-            .request_pty("xterm-256color", cols, rows, 0, 0, 0, 0)
+            .request_pty("xterm-256color", None, Some((cols, rows, 0, 0)))
             .map_err(|error| AppError::new(error.to_string()))?;
         channel.shell().map_err(|error| AppError::new(error.to_string()))?;
         Ok((session, channel))
@@ -352,7 +359,7 @@ fn ssh_worker(
                 let _ = channel.flush();
             }
             Ok(SessionCommand::Resize(new_cols, new_rows)) => {
-                let _ = channel.request_pty_size(new_rows, new_cols, None, None);
+                let _ = channel.request_pty_size(new_cols, new_rows, None, None);
             }
             Ok(SessionCommand::Close) | Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
             Err(std::sync::mpsc::TryRecvError::Empty) => {}

@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, State};
 
 /// Await an async service call from the sync command body.
-fn futures_now<F: std::future::Future>(future: F) -> Result<F::Output, String> {
+fn futures_now<F: std::future::Future>(future: F) -> F::Output {
     tokio::task::block_in_place(|| tauri::async_runtime::block_on(future))
 }
 

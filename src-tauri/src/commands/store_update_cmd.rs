@@ -38,7 +38,7 @@ pub async fn import_agent(state: State<'_, AppState>, payload: Option<Value>) ->
     let checkout = checkout_of(&payload);
     let emitter = Some(state.emitter.clone());
     run_value(move || {
-        let result = futures_now(state.store_agent.import_one(&checkout, &emitter))?;
+        let result = futures_now(state.store_agent.import_one(&checkout, &emitter));
         audit_result(&state, &actor, &result);
         Ok(result)
     })
@@ -58,7 +58,7 @@ pub async fn import_agent_all(state: State<'_, AppState>, payload: Option<Value>
         if checkouts.len() > 2000 {
             return Err(crate::error::AppError::new("At most 2000 checkouts can be imported in one run"));
         }
-        let summary = futures_now(state.store_agent.import_all(&checkouts, &emitter))?;
+        let summary = futures_now(state.store_agent.import_all(&checkouts, &emitter));
         if let Some(results) = summary.get("results").and_then(Value::as_array).cloned() {
             for result in &results {
                 audit_result(&state, &actor, result);
@@ -72,7 +72,7 @@ pub async fn import_agent_all(state: State<'_, AppState>, payload: Option<Value>
 pub async fn version(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let _ = state.actor()?;
     let checkout = checkout_of(&payload);
-    run_value(move || futures_now(state.store_update.check_one(&checkout)))
+    run_value(move || Ok(futures_now(state.store_update.check_one(&checkout))))
 }
 
 #[tauri::command(rename = "store-update:installed")]
@@ -100,7 +100,7 @@ pub async fn versions(state: State<'_, AppState>, payload: Option<Value>) -> Cmd
         .unwrap_or_default();
     let emitter = Some(state.emitter.clone());
     run_value(move || {
-        let results = futures_now(state.store_update.check_many(&checkouts, &emitter))?;
+        let results = futures_now(state.store_update.check_many(&checkouts, &emitter));
         state.database.audit(
             &actor,
             "STORE_VERSION_SWEEP",
@@ -167,7 +167,7 @@ pub async fn deploy(state: State<'_, AppState>, payload: Option<Value>) -> CmdRe
     let stamp = payload.get("stamp").and_then(Value::as_str).map(String::from);
     let emitter = Some(state.emitter.clone());
     run_value(move || {
-        let result = futures_now(state.store_update.deploy_one(&checkout, &source, &destination_path, &run_id, stamp, &emitter))?;
+        let result = futures_now(state.store_update.deploy_one(&checkout, &source, &destination_path, &run_id, stamp, &emitter));
         let label = checkout
             .get("name")
             .and_then(Value::as_str)
@@ -207,7 +207,7 @@ pub async fn deploy_all(state: State<'_, AppState>, payload: Option<Value>) -> C
     let destination_path = payload.get("destinationPath").and_then(Value::as_str).unwrap_or("").to_string();
     let emitter = Some(state.emitter.clone());
     run_value(move || {
-        let summary = futures_now(state.store_update.deploy_all(&checkouts, &source, &destination_path, &emitter))?;
+        let summary = futures_now(state.store_update.deploy_all(&checkouts, &source, &destination_path, &emitter));
         let file_name = source.rsplit(['\\', '/']).next().unwrap_or("—");
         state.database.audit(
             &actor,
@@ -220,6 +220,6 @@ pub async fn deploy_all(state: State<'_, AppState>, payload: Option<Value>) -> C
 }
 
 /// Await an async service call from the sync command body.
-fn futures_now<F: std::future::Future>(future: F) -> Result<F::Output, String> {
+fn futures_now<F: std::future::Future>(future: F) -> F::Output {
     tokio::task::block_in_place(|| tauri::async_runtime::block_on(future))
 }

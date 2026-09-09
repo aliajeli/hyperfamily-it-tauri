@@ -7,6 +7,7 @@ use crate::services::reachability::check_reachable;
 use crate::services::registry::pick_program;
 use crate::services::store_agent::StoreAgentService;
 use crate::services::{software::sha256_file, Emitter};
+use chrono::Datelike;
 use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::Arc;

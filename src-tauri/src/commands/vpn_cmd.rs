@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use tauri::State;
 
 /// Await an async service call from the sync command body.
-fn futures_now<F: std::future::Future>(future: F) -> Result<F::Output, String> {
+fn futures_now<F: std::future::Future>(future: F) -> F::Output {
     tokio::task::block_in_place(|| tauri::async_runtime::block_on(future))
 }
 
@@ -38,5 +38,5 @@ pub async fn disconnect(state: State<'_, AppState>) -> CmdResult {
 #[tauri::command(rename = "vpn:diagnose")]
 pub async fn diagnose(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
-    run_value(move || Ok(futures_now(state.vpn.diagnose())?))
+    run_value(move || Ok(futures_now(state.vpn.diagnose())))
 }

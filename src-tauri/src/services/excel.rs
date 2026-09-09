@@ -316,7 +316,8 @@ fn create_equipment_sheet(book: &mut umya_spreadsheet::Workbook, type_name: &str
     let last_column = headers.len() as u32;
     style_sheet(worksheet, &headers);
     add_list_validation(worksheet, "Dashboard", &["Show", "Hide"], last_column);
-    for group in 1..=if type_name == "Switch" { MAX_SWITCH_PORTS } else { 0 } {
+    let port_groups = if type_name == "Switch" { MAX_SWITCH_PORTS } else { 0 };
+    for group in 1..=port_groups {
         let status_header = switch_port_header(group, "Status");
         add_list_validation(worksheet, &status_header, &["Up", "Down", "Disabled"], last_column);
         let number_header = switch_port_header(group, "Number");
