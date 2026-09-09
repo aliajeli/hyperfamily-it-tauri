@@ -11,17 +11,26 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    throw "Agent version is required: -Version <major.minor.patch> (read from package.json by CI)."
+}
+if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') {
+    throw "Invalid agent version: '$Version'"
+}
+
 if (-not $env:OS -or $env:OS -notlike "*Windows*") {
     throw "Native agent release builds require Windows, CMake and Visual Studio C++ Build Tools."
 }
 
 $build = Join-Path $root "agent/build/cmake"
-cmake -S (Join-Path $root "agent") -B $build -A x64 -DAGENT_VERSION=$Version
+Write-Host "Configuring agent build at $build"
+& cmake -S (Join-Path $root "agent") -B $build -A x64 "-DAGENT_VERSION=$Version"
+if ($LASTEXITCODE -ne 0) { throw "cmake configure failed with exit code $LASTEXITCODE" }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cmake --build $build --config Release --parallel 2
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-ctest --test-dir $build -C Release --output-on-failure
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& cmake --build $build --config Release --parallel 2
+if ($LASTEXITCODE -ne 0) { throw "cmake build failed with exit code $LASTEXITCODE" }
+& ctest --test-dir $build -C Release --output-on-failure
+if ($LASTEXITCODE -ne 0) { throw "agent tests failed with exit code $LASTEXITCODE" }
 
 $exe = Join-Path $root "agent/build/HyperFamilyStoreAgent.exe"
 if (-not (Test-Path $exe)) { throw "Agent binary was not produced: $exe" }

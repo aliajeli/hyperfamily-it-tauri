@@ -49,8 +49,10 @@ jobs:
       - name: Build native store agent
         shell: pwsh
         run: |
-          $version = (Get-Content package.json | ConvertFrom-Json).version
-          powershell -ExecutionPolicy Bypass -File scripts/build-agent.ps1 -Version "$version"
+          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          Write-Host "Agent version: $version"
+          & ./scripts/build-agent.ps1 -Version "$version"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install frontend dependencies
         run: npm ci
