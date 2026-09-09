@@ -9,7 +9,7 @@ use tauri_plugin_dialog::DialogExt;
 #[tauri::command]
 pub async fn inventory_list(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
-    run_value(move || state.database.list_inventory().map(|rows| Value::Array(rows)))
+    run_value(move || state.database.list_inventory().map(Value::Array))
 }
 
 #[tauri::command]

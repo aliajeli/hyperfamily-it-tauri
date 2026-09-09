@@ -204,8 +204,16 @@ pub fn run() {
             commands::store_update_cmd::store_update_deploy,
             commands::store_update_cmd::store_update_deploy_all,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running HyperFamily Branch Monitor");
+        .build(tauri::generate_context!())
+        .expect("error while building HyperFamily Branch Monitor")
+        .run(|app, event| {
+            // Electron's before-quit: close every terminal session gracefully.
+            if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app.try_state::<AppState>() {
+                    state.terminal.stop();
+                }
+            }
+        });
 }
 
 /// Port of PingMonitor: first pass after 250 ms, then one pass every
@@ -222,7 +230,7 @@ fn start_ping_loop(app: tauri::AppHandle, emitter: services::Emitter) {
                 Ok(()) => {
                     let settings = database.get_settings().unwrap_or(Value::Null);
                     let interval = settings.get("ping_interval").and_then(Value::as_f64).unwrap_or(3.0);
-                    std::time::Duration::from_secs_f64((interval.max(1.0)) as f64)
+                    std::time::Duration::from_secs_f64((interval.max(1.0)))
                 }
                 Err(error) => {
                     database.audit("System", "PING_SERVICE_ERROR", "Monitoring", &error.message);

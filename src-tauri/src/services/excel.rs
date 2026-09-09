@@ -667,7 +667,7 @@ impl<'a> ExcelService<'a> {
 
         let mut book = umya_spreadsheet::new_file();
         {
-            let worksheet = book.get_sheet_mut(&0).expect("fresh workbook");
+            let worksheet = book.sheet_mut(0).expect("fresh workbook");
             let _ = worksheet.set_name("Inventory");
             for (index, (_, header, width)) in columns.iter().enumerate() {
                 let letter = column_letter(index as u32 + 1);

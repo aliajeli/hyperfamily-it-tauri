@@ -8,7 +8,7 @@ use tauri::State;
 #[tauri::command]
 pub async fn credentials_list(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
-    run_value(move || state.database.list_credentials().map(|rows| Value::Array(rows)))
+    run_value(move || state.database.list_credentials().map(Value::Array))
 }
 
 #[tauri::command]
@@ -25,7 +25,7 @@ pub async fn credentials_reveal(state: State<'_, AppState>, payload: Option<Valu
 #[tauri::command]
 pub async fn credentials_save(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
-    run_value(move || state.database.save_credential(&payload.unwrap_or(json!({})), &actor).map(Value::from))
+    run_value(move || state.database.save_credential(&payload.unwrap_or(json!({})), &actor))
 }
 
 #[tauri::command]
@@ -54,7 +54,7 @@ pub async fn credentials_for_device(state: State<'_, AppState>, payload: Option<
     let _ = state.actor()?;
     run_value(move || {
         let device_id = payload.as_ref().and_then(Value::as_f64).map(|value| value as i64).unwrap_or(0);
-        state.database.list_credentials_for_device(device_id).map(|rows| Value::Array(rows))
+        state.database.list_credentials_for_device(device_id).map(Value::Array)
     })
 }
 
@@ -89,5 +89,5 @@ pub async fn credentials_assign_type(state: State<'_, AppState>, payload: Option
 #[tauri::command]
 pub async fn credentials_overview(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
-    run_value(move || state.database.list_device_credential_overview().map(|rows| Value::Array(rows)))
+    run_value(move || state.database.list_device_credential_overview().map(Value::Array))
 }

@@ -347,14 +347,20 @@ impl UpdateService {
     }
 
     fn register_chunk(&self, chunk: u64, total: Option<u64>) {
-        let mut tracker = self.status.lock();
-        let transferred = tracker.get("transferred").and_then(Value::as_u64).unwrap_or(0) + chunk;
-        tracker["transferred"] = json!(transferred);
-        if let Some(total) = total {
-            if total > 0 {
-                tracker["total"] = json!(total);
+        let transferred = {
+            let mut tracker = self.status.lock();
+            let transferred = tracker.get("transferred").and_then(Value::as_u64).unwrap_or(0) + chunk;
+            tracker["transferred"] = json!(transferred);
+            if let Some(total) = total {
+                if total > 0 {
+                    tracker["total"] = json!(total);
+                }
             }
-        }
+            transferred
+        };
+        let total = self.status.lock().get("total").and_then(Value::as_u64).unwrap_or(0);
+        // Full Electron-parity progress: percent, smoothed rate and ETA.
+        self.report_progress(transferred, total, None);
     }
 
     pub async fn pause(&self, cancel: &Arc<std::sync::atomic::AtomicBool>) -> AppResult<Value> {

@@ -70,7 +70,7 @@ trait CreationFlagsNp {
 #[cfg(windows)]
 impl CreationFlagsNp for tokio::process::Command {
     fn creation_flags_np(&mut self) -> &mut Self {
-        use std::os::windows::process::CommandExt;
+        // tokio::process::Command carries an inherent creation_flags on Windows.
         self.creation_flags(0x08000000)
     }
 }

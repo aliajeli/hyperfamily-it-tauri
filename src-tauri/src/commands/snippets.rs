@@ -7,13 +7,13 @@ use tauri::State;
 #[tauri::command]
 pub async fn snippets_list(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
-    run_value(move || state.database.list_snippets().map(|rows| Value::Array(rows)))
+    run_value(move || state.database.list_snippets().map(Value::Array))
 }
 
 #[tauri::command]
 pub async fn snippets_save(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
     let actor = state.actor()?;
-    run_value(move || state.database.save_snippet(&payload.unwrap_or(json!({})), &actor).map(Value::from))
+    run_value(move || state.database.save_snippet(&payload.unwrap_or(json!({})), &actor))
 }
 
 #[tauri::command]

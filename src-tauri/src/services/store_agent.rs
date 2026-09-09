@@ -218,7 +218,12 @@ impl StoreAgentService {
                 }
                 locks.insert(key.clone(), ());
             }
-            let result = self.install(&host, &record, emitter).await;
+            // Electron parity (agent.service.js): the whole install runs
+            // inside an SMB session for the target host, so the UNC paths
+            // below authenticate through `net use` instead of ambient tokens.
+            let credentials = (self.get_credentials)();
+            let install = self.install(&host, &record, emitter);
+            let result = self.smb.with_host(&host, &credentials, install).await;
             self.locks.lock().remove(&key);
             let payload = result?;
             let mut merged = json!({
@@ -257,7 +262,7 @@ impl StoreAgentService {
         if !source_meta.is_file() {
             return Err(AppError::new("The bundled agent EXE is missing. Install the full desktop package or run npm run build:agent"));
         }
-        let source_size = source_meta.len();
+        let _source_size = source_meta.len();
         let source = self.source_path.clone();
 
         let hash_label = format!("Hashing bundled agent for {host}");
@@ -302,7 +307,7 @@ impl StoreAgentService {
         let result: AppResult<Value> = async {
             record("service-check", &format!("Checking the existing Windows agent service on {host}"), None);
             let previous_exists = previous.get("exists").and_then(Value::as_bool).unwrap_or(false);
-            let previous_state = previous.get("state").and_then(Value::as_str).unwrap_or("Missing").to_string();
+            let _previous_state = previous.get("state").and_then(Value::as_str).unwrap_or("Missing").to_string();
             if previous_exists {
                 self.control.assert_owned_service(host).await?;
             }

@@ -121,5 +121,5 @@ where
 
 /// Shorthand for command bodies that already produce `Value`s.
 pub fn run_value(task: impl FnOnce() -> crate::error::AppResult<Value>) -> CmdResult {
-    task().map_err(|error| friendly(error))
+    task().map_err(friendly)
 }

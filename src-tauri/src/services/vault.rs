@@ -33,7 +33,7 @@ fn dpapi_protect(plain: &[u8]) -> AppResult<Vec<u8>> {
         .map_err(|e| AppError::new(format!("DPAPI encryption failed: {e}")))?;
         let slice = std::slice::from_raw_parts(out.pbData, out.cbData as usize);
         let bytes = slice.to_vec();
-        let _ = LocalFree(Some(windows::Win32::Foundation::HLOCAL(out.pbData.cast())));
+        let _ = LocalFree(windows::Win32::Foundation::HLOCAL(out.pbData.cast()));
         Ok(bytes)
     }
 }
@@ -49,7 +49,7 @@ fn dpapi_unprotect(blob: &[u8]) -> AppResult<Vec<u8>> {
             .map_err(|e| AppError::new(format!("DPAPI decryption failed: {e}")))?;
         let slice = std::slice::from_raw_parts(out.pbData, out.cbData as usize);
         let bytes = slice.to_vec();
-        let _ = LocalFree(Some(windows::Win32::Foundation::HLOCAL(out.pbData.cast())));
+        let _ = LocalFree(windows::Win32::Foundation::HLOCAL(out.pbData.cast()));
         Ok(bytes)
     }
 }
@@ -184,7 +184,7 @@ impl SecureVault {
             return Ok(String::new());
         }
         if let Some(blob) = payload.strip_prefix("dpapi:") {
-            let bytes = base64::engine::general_purpose::STANDARD.decode(blob.trim())
+            let _bytes = base64::engine::general_purpose::STANDARD.decode(blob.trim())
                 .map_err(|e| AppError::new(format!("Invalid encrypted payload: {e}")))?;
             #[cfg(windows)]
             {

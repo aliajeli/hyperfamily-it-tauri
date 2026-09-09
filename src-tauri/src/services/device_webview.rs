@@ -217,7 +217,7 @@ pub fn open_device_webview(
     let window = builder.build().map_err(|error| error.to_string())?;
     let window_clone = window.clone();
     let app_clone = app.clone();
-    let key_clone = key.clone();
+    let _key_clone = key.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(400));
         let _ = window_clone.show();
@@ -248,7 +248,7 @@ pub fn broadcast_palette(palette: &Value) {
   style.textContent = css;
   window.dispatchEvent(new CustomEvent('hyperfamily-device-palette', {{ detail: palette }}));
 }})()"#,
-        palette = palette.to_string(),
+        palette = palette,
         css = css
     );
     for meta in windows.values_mut() {

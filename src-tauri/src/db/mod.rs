@@ -291,7 +291,7 @@ fn save_device_conn(connection: &Connection, data: &Value) -> AppResult<SavedRow
     } else {
         vec![]
     };
-    let device_ip = data.get("ip").and_then(Value::as_str).unwrap_or("").to_string();
+    let _device_ip = data.get("ip").and_then(Value::as_str).unwrap_or("").to_string();
     let editing_id = as_id(data.get("id"));
 
     let tx = connection.unchecked_transaction()?;
@@ -384,7 +384,7 @@ pub fn replace_switch_ports_conn(connection: &Connection, device_id: i64, ports:
 
 pub fn list_switch_ports_conn(connection: &Connection, device_id: Option<i64>) -> AppResult<Vec<Value>> {
     let mut stmt = match device_id {
-        Some(id) => connection.prepare("SELECT * FROM switch_ports WHERE device_id = ?1 ORDER BY port_number")?,
+        Some(_id) => connection.prepare("SELECT * FROM switch_ports WHERE device_id = ?1 ORDER BY port_number")?,
         None => connection.prepare("SELECT * FROM switch_ports ORDER BY device_id, port_number")?,
     };
     let rows = match device_id {
@@ -1334,7 +1334,7 @@ impl AppDatabase {
                     "branch_name": row.get("branch_name").and_then(Value::as_str).filter(|text| !text.is_empty()).unwrap_or("—"),
                     "credential_id": direct_id,
                     "effective_name": if !direct_name.is_empty() { json!(direct_name) } else if !type_name.is_empty() { json!(type_name) } else { Value::Null },
-                    "source": if !direct_name.is_empty() && direct_id.is_null() == false { "device" } else if !type_name.is_empty() && type_id.is_null() == false { "type" } else { "none" }
+                    "source": if !direct_name.is_empty() && !direct_id.is_null() { "device" } else if !type_name.is_empty() && !type_id.is_null() { "type" } else { "none" }
                 })
             })
             .collect())
@@ -1351,7 +1351,7 @@ impl AppDatabase {
                 )
                 .ok()
         };
-        let Some((id, device_type)) = device else { return Ok(vec![]) };
+        let Some((_id, _device_type)) = device else { return Ok(vec![]) };
         let lock_guard = self.lock();
         let mut stmt = lock_guard.prepare(
             "SELECT c.id, c.name, c.username, 1 AS has_password, 'device' AS scope
@@ -1447,7 +1447,7 @@ impl AppDatabase {
             row["tags"] = json!(tags);
             return Ok(row);
         }
-        let row_id = connection.execute(
+        let _row_id = connection.execute(
             "INSERT INTO notes (name, body, pinned, color, priority, tags) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![name, body, pinned, color, priority, tags_json],
         )?;
@@ -1670,7 +1670,7 @@ impl AppDatabase {
     }
 
     pub fn list_audit(&self, limit: i64) -> AppResult<Vec<Value>> {
-        let limit = limit.clamp(1, 1000);
+        let _limit = limit.clamp(1, 1000);
         let lock_guard = self.lock();
         let mut stmt = lock_guard.prepare("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?1")?;
         rows_to_json(&mut stmt)

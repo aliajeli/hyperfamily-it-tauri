@@ -72,8 +72,7 @@ async fn query_service_running(name: &str) -> bool {
     command.args(["query", name]);
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
+        command.creation_flags(0x08000000); // inherent on tokio's Command
     }
     let output = tokio::time::timeout(Duration::from_millis(4000), command.output()).await;
     match output {
@@ -110,8 +109,7 @@ async fn is_forticlient_process_running() -> bool {
     command.args(["/fo", "csv", "/nh"]);
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
+        command.creation_flags(0x08000000); // inherent on tokio's Command
     }
     let output = tokio::time::timeout(Duration::from_millis(6000), command.output()).await;
     match output {
@@ -257,7 +255,7 @@ impl VpnService {
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .spawn()
-                .map(|child| std::mem::forget(child));
+                .map(std::mem::forget);
         } else {
             self.emit_status("error", None, "FortiClient VPN is not installed on this computer. Install the FortiClient VPN client, then try the Global mode again.");
             return Err(AppError::with_payload(
@@ -383,8 +381,7 @@ impl VpnService {
                 command.args(&args);
                 #[cfg(windows)]
                 {
-                    use std::os::windows::process::CommandExt;
-                    command.creation_flags(0x08000000);
+                    command.creation_flags(0x08000000); // inherent on tokio's Command
                 }
                 let _ = tokio::time::timeout(Duration::from_millis(15000), command.output()).await;
             }

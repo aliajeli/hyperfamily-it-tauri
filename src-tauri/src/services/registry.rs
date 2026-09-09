@@ -180,12 +180,11 @@ pub async fn read_hive_over_share(host: &str, timeout_ms: u64) -> AppResult<Vec<
     for candidate in &candidates {
         let meta = tokio::fs::metadata(candidate).await;
         if let Ok(meta) = meta {
-            if meta.len() > 0 {
-                if tokio::fs::copy(candidate, &local_copy).await.is_ok() {
+            if meta.len() > 0
+                && tokio::fs::copy(candidate, &local_copy).await.is_ok() {
                     copied = true;
                     break;
                 }
-            }
         }
     }
     if !copied {

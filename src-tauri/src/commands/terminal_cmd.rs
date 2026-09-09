@@ -8,7 +8,7 @@ use tauri::State;
 #[tauri::command]
 pub async fn terminal_targets(state: State<'_, AppState>) -> CmdResult {
     let _ = state.actor()?;
-    run_value(move || state.terminal.targets().map(|rows| Value::Array(rows)))
+    run_value(move || state.terminal.targets().map(Value::Array))
 }
 
 #[tauri::command]
@@ -20,7 +20,7 @@ pub async fn terminal_open(state: State<'_, AppState>, payload: Option<Value>) -
 
 #[tauri::command]
 pub async fn terminal_write(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
-    let actor = state.actor()?;
+    let _actor = state.actor()?;
     let payload = payload.unwrap_or(json!({}));
     run_value(move || {
         let session_id = payload.get("sessionId").and_then(Value::as_str).unwrap_or("");
@@ -31,7 +31,7 @@ pub async fn terminal_write(state: State<'_, AppState>, payload: Option<Value>) 
 
 #[tauri::command]
 pub async fn terminal_resize(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
-    let actor = state.actor()?;
+    let _actor = state.actor()?;
     let payload = payload.unwrap_or(json!({}));
     run_value(move || {
         let session_id = payload.get("sessionId").and_then(Value::as_str).unwrap_or("");
@@ -43,7 +43,7 @@ pub async fn terminal_resize(state: State<'_, AppState>, payload: Option<Value>)
 
 #[tauri::command]
 pub async fn terminal_close(state: State<'_, AppState>, payload: Option<Value>) -> CmdResult {
-    let actor = state.actor()?;
+    let _actor = state.actor()?;
     let session_id = payload.as_ref().and_then(Value::as_str).unwrap_or("").to_string();
     run_value(move || state.terminal.close(&session_id, "Closed by the operator").map(|ok| json!(ok)))
 }

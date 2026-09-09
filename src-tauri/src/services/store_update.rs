@@ -524,7 +524,7 @@ impl StoreUpdateService {
 /// only `Err` escape is the session setup itself.
 #[allow(clippy::too_many_arguments)]
 async fn run_pipeline(
-    service: &StoreUpdateService,
+    _service: &StoreUpdateService,
     source: &str,
     destination_path: &str,
     file_name: &str,

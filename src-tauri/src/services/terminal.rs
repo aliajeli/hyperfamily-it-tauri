@@ -330,7 +330,7 @@ fn ssh_worker(
         Ok((session, channel))
     };
     report_status(&emitter, session_id, "connecting", None);
-    let (mut session, mut channel) = match connect() {
+    let (session, mut channel) = match connect() {
         Ok(pair) => {
             report_status(&emitter, session_id, "connected", None);
             pair
@@ -341,8 +341,8 @@ fn ssh_worker(
             return;
         }
     };
-    let _ = session.set_blocking(false);
-    let _ = session.set_timeout(120);
+    session.set_blocking(false);
+    session.set_timeout(120);
     let mut buffer = [0u8; 16 * 1024];
     loop {
         // Incoming device output.

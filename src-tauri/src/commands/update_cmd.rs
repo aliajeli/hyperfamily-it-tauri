@@ -23,7 +23,7 @@ pub async fn update_state(state: State<'_, AppState>) -> CmdResult {
 
 #[tauri::command]
 pub async fn update_download(state: State<'_, AppState>) -> CmdResult {
-    let actor = state.actor()?;
+    let _actor = state.actor()?;
     let cancel = state.update_cancel.clone();
     run_value(move || {
         cancel.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -33,21 +33,21 @@ pub async fn update_download(state: State<'_, AppState>) -> CmdResult {
 
 #[tauri::command]
 pub async fn update_pause(state: State<'_, AppState>) -> CmdResult {
-    let actor = state.actor()?;
+    let _actor = state.actor()?;
     let cancel = state.update_cancel.clone();
     run_value(move || futures_now(state.update.pause(&cancel)))
 }
 
 #[tauri::command]
 pub async fn update_resume(state: State<'_, AppState>) -> CmdResult {
-    let actor = state.actor()?;
+    let _actor = state.actor()?;
     let cancel = state.update_cancel.clone();
     run_value(move || futures_now(state.update.resume(&cancel)))
 }
 
 #[tauri::command]
 pub async fn update_stop(state: State<'_, AppState>) -> CmdResult {
-    let actor = state.actor()?;
+    let _actor = state.actor()?;
     let cancel = state.update_cancel.clone();
     run_value(move || futures_now(state.update.stop(&cancel)))
 }

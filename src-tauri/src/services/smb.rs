@@ -182,8 +182,10 @@ impl SmbSessionManager {
     /// identity, which is what a same-domain deployment needs.
     pub async fn with_host<T, F>(&self, host: &str, credentials: &Value, task: F) -> Result<T, AppError>
     where
-        F: std::future::Future<Output = Result<T, AppError>> + Send,
-        T: Send,
+        // The task is awaited inline on the caller's context (never spawned),
+        // so it does not need to be Send — agent import drives it with a
+        // non-Send progress closure, matching electron's withHost wrapper.
+        F: std::future::Future<Output = Result<T, AppError>>,
     {
         let clean = normalize_host(host)?;
         let username = credentials.get("username").and_then(Value::as_str).unwrap_or("");

@@ -9,6 +9,6 @@ pub async fn audit_list(state: State<'_, AppState>, payload: Option<Value>) -> C
     let _ = state.actor()?;
     run_value(move || {
         let limit = payload.as_ref().and_then(Value::as_f64).map(|value| value as i64).unwrap_or(200);
-        state.database.list_audit(limit).map(|rows| Value::Array(rows))
+        state.database.list_audit(limit).map(Value::Array)
     })
 }

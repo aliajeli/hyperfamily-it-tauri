@@ -103,7 +103,7 @@ impl RemoteService {
         }
         .await;
         match &result {
-            Ok(value) => {
+            Ok(_value) => {
                 let detail = credential
                     .as_ref()
                     .map(|credential| format!("Credential: {}", credential.get("name").and_then(Value::as_str).unwrap_or("")))
