@@ -87,6 +87,40 @@ jobs:
           Get-ChildItem src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe |
             ForEach-Object { "{0}  {1:N0} bytes" -f $_.Name, $_.Length }
 
+      - name: Generate updater latest.json
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        shell: pwsh
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          # The authoritative app version lives in tauri.conf.json (-Raw: pwsh
+          # otherwise parses line-by-line).
+          $config = Get-Content -Raw src-tauri/tauri.conf.json | ConvertFrom-Json
+          $version = $config.version
+          if (-not $version) { throw "tauri.conf.json version is empty" }
+          $bundle = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
+          $installer = Get-ChildItem "$bundle/*-setup.exe" | Select-Object -First 1
+          if (-not $installer) { throw "No NSIS installer found in $bundle" }
+          $signature = (Get-Content -Raw "$($installer.FullName).sig").Trim()
+          if (-not $signature) { throw "Empty updater signature for $($installer.Name)" }
+          $feed = [ordered]@{
+            version = $version
+            notes = "HyperFamily Branch Monitor $version"
+            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = [ordered]@{
+              "windows-x86_64" = [ordered]@{
+                signature = $signature
+                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:TAG_NAME/$($installer.Name)"
+              }
+            }
+          }
+          $outDir = "src-tauri/target/x86_64-pc-windows-msvc/release/updater"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          ($feed | ConvertTo-Json -Depth 5) | Out-File -Encoding ascii "$outDir/latest.json"
+          Write-Host "----- latest.json -----"
+          Get-Content "$outDir/latest.json"
+
       - name: Attach artifacts to the release
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         uses: softprops/action-gh-release@v2
